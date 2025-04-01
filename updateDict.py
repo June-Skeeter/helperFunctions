@@ -1,9 +1,8 @@
+# more comprehensive way to update items in a nested dict compared to the base|new operator
 import copy
-
 def updateDict(base,new,overwrite=False,verbose=False):
     base = copy.deepcopy(base)
     if base == new: return(base)
-    # more comprehensive way to update items in a nested dict
     for key,value in new.items():
         if type(base) is dict and key not in base.keys():
             if verbose: print('setting: ',key,' = ',base,'\n to: ',key,' = ',value)
