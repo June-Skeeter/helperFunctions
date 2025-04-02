@@ -1,9 +1,10 @@
 import os
 import yaml
 import json
-from . import log
+from .log import log
+from .saveDict import saveDict
 # read a dict from file in either .json or .yml format
-def loadDict(file,verbose=False,safemode=False):
+def loadDict(file,verbose=False):
     file = os.path.abspath(file)
     if os.path.isfile(file):
         if file.endswith('.yml'):
@@ -12,13 +13,8 @@ def loadDict(file,verbose=False,safemode=False):
         elif file.endswith('.json'):
             with open(file) as f:
                 out = json.load(f)   
-    elif not safemode:
-        if verbose: log(f"{file}\ndoes not exist, creating empty file")
+    else:
+        log(f"{file}\n\ndoes not exist, creating empty file",ln=False,verbose=verbose)
         out = {}
-        # saveDict(out,file)
-    # elif verbose:
-    #     out = None
-    #     print(f"{file} does not exist")
-    # log(file,fn=False,verbose=verbose)
-    # log(out,fn=False,verbose=verbose)
+        saveDict(out,file)
     return(out)
