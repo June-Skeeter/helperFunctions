@@ -9,7 +9,7 @@ from .saveDict import saveDict
 
 
 # read a dict from file in either .json or .yml format
-def loadDict(file,template = {},verbose=False):
+def loadDict(file,template = {},verbose=False,ln=False):
     file = os.path.abspath(file)
     if os.path.isfile(file):
         if file.endswith('.yml') or file.endswith('.yaml'):
@@ -21,8 +21,10 @@ def loadDict(file,template = {},verbose=False):
         else:
             sys.exit(f'File format not supported for {file}')
     else:
-        log(f"{file}\n\ndoes not exist, creating new file using template",ln=False,verbose=verbose)
-        log(template,fn=False,verbose=verbose)
+        print(file)
+        log(f"Does not exist:\n{file}]\nCreating new file using template:",ln=True,verbose=verbose)
+        print(template)
+        log(template,fn=False,ln=ln,verbose=verbose)
         out = copy.deepcopy(template)
         saveDict(out,file)
     return(out)
