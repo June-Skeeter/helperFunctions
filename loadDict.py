@@ -21,9 +21,11 @@ def loadDict(file,template = {},verbose=False,ln=False):
         else:
             sys.exit(f'File format not supported for {file}')
     else:
-        print(file)
-        log(f"Does not exist:\n{file}]\nCreating new file using default or user-provided template:",ln=True,verbose=verbose)
-        log(template,fn=False,ln=ln,verbose=verbose)
+        try:
+            log(f"Does not exist:\n{file}\nCreating new file using default or user-provided template:\n{template}",ln=True,verbose=verbose)
+        except:
+            log(f"Does not exist:\n{file}\nCreating new file using default or user-provided template:\n",ln=True,verbose=verbose)
+            pass
         out = copy.deepcopy(template)
         saveDict(out,file)
     return(out)
