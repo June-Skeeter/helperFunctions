@@ -1,6 +1,6 @@
 
 import os
-import updateDict
+from . import updateDict
 # Stashing here incase needed for later.  
 def unpackDict(Tree,format=os.path.sep,limit=None):
     # recursive function to condense a nested dict by concatenating keys to a string
@@ -26,7 +26,7 @@ def unpackDict(Tree,format=os.path.sep,limit=None):
         return(pth)
     return(unpack(Tree,format=format,limit=limit))
 
-def packDict(itemList,format=os.path.sep,limit=None,order=-1,fill=None):
+def packDict(itemList,format=os.path.sep,limit=None,order=-1,fill=None,verbose=False):
     # recursive function to generate nested dict from list of strings, splitting by sep
     Tree = {}
     if type(itemList) is list:
@@ -62,5 +62,5 @@ def packDict(itemList,format=os.path.sep,limit=None,order=-1,fill=None):
                     subTree = {format.join(b[end-1:]):value}
                 else:
                     subTree = {b[end-1-i]:subTree}
-        Tree = updateDict.updateDict(Tree,subTree,overwrite='append')
+        Tree = updateDict.updateDict(Tree,subTree,overwrite='append',verbose=verbose)
     return(Tree)
