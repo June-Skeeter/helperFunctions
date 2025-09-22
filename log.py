@@ -11,9 +11,9 @@ def log(msg='',ln=True,fn=True,verbose=True,kill=False):
             if fn:
                 cf.f_back.f_code.co_filename
                 msg = f"{cf.f_back.f_code.co_filename} "+ msg
-        print()
-        print(msg)
         if kill:
-            sys.exit('log-kill')
+            sys.exit('\nError:\n',msg)
+        else:
+            print(msg)
     else:
         return(msg)
