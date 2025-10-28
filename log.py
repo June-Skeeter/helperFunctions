@@ -2,6 +2,7 @@
 from inspect import currentframe
 import sys
 def log(msg='',ln=True,fn=True,verbose=True,kill=False):
+    print('log?',kill)
     if verbose:
         if type(msg) == list or type(msg) == tuple:
             msg = ' '.join([str(m) for m in msg])
@@ -12,7 +13,7 @@ def log(msg='',ln=True,fn=True,verbose=True,kill=False):
                 cf.f_back.f_code.co_filename
                 msg = f"{cf.f_back.f_code.co_filename} "+ msg
         if kill:
-            sys.exit('\nError:\n',msg)
+            sys.exit('\nError:\n'+msg)
         else:
             print(msg)
     else:
