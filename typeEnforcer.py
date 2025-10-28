@@ -24,6 +24,5 @@ class typeEnforcer:
                     self.error(msg=f'{name} must be one of {field.metadata["options"]}')
 
     def error(self,msg='',ln=False,fn=False,kill=True):
-        print(msg)
         log(msg=msg,ln=False,fn=False,kill=True,verbose=True)
             

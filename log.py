@@ -2,7 +2,6 @@
 from inspect import currentframe
 import sys
 def log(msg='',ln=True,fn=True,verbose=True,kill=False):
-    print('log?',kill)
     if verbose:
         if type(msg) == list or type(msg) == tuple:
             msg = ' '.join([str(m) for m in msg])
