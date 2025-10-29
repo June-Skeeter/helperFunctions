@@ -5,12 +5,12 @@ def log(msg='',ln=True,fn=True,verbose=True,kill=False):
     if verbose:
         if type(msg) == list or type(msg) == tuple:
             msg = ' '.join([str(m) for m in msg])
-        if ln:
+        if ln or fn:
             cf = currentframe()
-            msg = f"line {cf.f_back.f_lineno}:\n{msg}"
             if fn:
-                cf.f_back.f_code.co_filename
-                msg = f"{cf.f_back.f_code.co_filename} "+ msg
+                msg = f"{msg}\{cf.f_back.f_code.co_filename}"
+            if ln:
+                msg = f"{msg}\nLine #:{cf.f_back.f_lineno}"
         if kill:
             sys.exit('\nError:\n'+msg)
         else:

@@ -5,8 +5,10 @@
 # 3) get utmCoordinates zone and coordinates
 
 import re
-# from pyproj import CRS
 from dataclasses import dataclass,field
+import geopandas as gpd
+from pyproj import CRS
+import utm
 
 @dataclass
 class geographicCoordinates:
@@ -50,7 +52,6 @@ class geographicCoordinates:
 
 @dataclass
 class utmCoordinates:
-    import utm
     latitude: float = None
     longitude: float = None
     x: float = None
@@ -72,7 +73,6 @@ class utmCoordinates:
 
 @dataclass(kw_only=True)
 class parseCoordinates:
-    import geopandas as gpd
     ID:list = 'ID'
     latitude: list = None
     longitude: list = None
@@ -82,10 +82,10 @@ class parseCoordinates:
     geodataframe: gpd.GeoDataFrame = field(default_factory=lambda:gpd.GeoDataFrame(),repr=False)
     
     def __post_init__(self):
-        if not self.latitude or not self.longitude:
-            return
         self.geographicCoordinates = geographicCoordinates(latitude=self.latitude,longitude=self.longitude,datum=self.datum)
         self.latitude,self.longitude=self.geographicCoordinates.latitude,self.geographicCoordinates.longitude
+        if not self.latitude or not self.longitude:
+            return
         self.UTM = utmCoordinates(latitude=self.latitude,longitude=self.longitude,datum=self.datum)
         self.geodataframe = gpd.GeoDataFrame(index=[self.ID],
                                              data=self.attributes,
