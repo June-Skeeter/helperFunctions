@@ -1,3 +1,6 @@
+
+from .log import log
+log('Note to self: this is depreciated, use dictFuncs.dcToDcit instead',fn=True,ln=True,kill=True)
 # given a dataclass, dump items where repr=true to a dictionary
 def asdict_repr(dc,repr=True):
     if repr:

@@ -2,6 +2,9 @@ import os
 import yaml
 import json
 
+from .log import log
+log('Note to self: this is depreciated, use dictFuncs.dcToDcit instead',fn=True,ln=True,kill=True)
+
 # save a dict (obj) to a file (outputPath) in either .json or .yml format
 def saveDict(obj,outputPath,sort_keys=False,indent=None,anchors=False):
     if os.path.split(outputPath)[0] == '':

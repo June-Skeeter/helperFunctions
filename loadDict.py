@@ -6,6 +6,8 @@ import copy
 from .log import log
 from .saveDict import saveDict
 
+from .log import log
+log('Note to self: this is depreciated, use dictFuncs.dcToDcit instead',fn=True,ln=True,kill=True)
 
 
 # read a dict from file in either .json or .yml format
