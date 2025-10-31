@@ -7,10 +7,10 @@ import os
 # Useful collection of parentclass functions
 @dataclass
 class baseFunctions:
-    verbose: bool = True # Enable verbose output for type coercion warnings
-    yamlConfigFile: str = None # If valid yaml file path is provided, the dataclass will read from the file
-    typeCheck: bool = True
-    message: str = ''
+    verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
+    yamlConfigFile: str = field(default=None,repr=False) # If valid yaml file path is provided, the dataclass will read from the file
+    typeCheck: bool = field(default=True,repr=False)
+    message: str = field(default='',repr=False)
     
     def __post_init__(self):
         if self.yamlConfigFile:
@@ -46,7 +46,7 @@ class baseFunctions:
         ]
         root,fn = os.path.split(self.yamlConfigFile)
         if os.path.exists(self.yamlConfigFile):
-            self.logAction(f'Loading {self.yamlConfigFile}')
+            self.logAction(f'Loading: {self.yamlConfigFile}')
             tmp,self.header = loadDict(fileName=self.yamlConfigFile)
             for key,value in tmp.items():
                 if self.__dict__[key] is None:
@@ -57,15 +57,30 @@ class baseFunctions:
             self.logError(f'Root path {root} exists amd is not empty but is missing {fn}. Please check.')
     
     def saveToYaml(self,repr=True,inheritance=False):
+        print(type(self).__name__)
         if hasattr(self,'header'):
             header=self.header
         else:
             header=None
+        # print('\n\n',self.yamlConfigFile,'\n\n')
         saveDict(
             dcToDict(self,repr=True,inheritance=False),
             fileName=self.yamlConfigFile,
             header=header
         )
+        
+    def snycAttributes(self,incoming,inheritance=False,overwrite=False):
+        # Add attributes of one class to another and avoid ciruclar imports
+        if inheritance:
+            keys = list(incoming.__dataclass_fields__.keys())
+        else:
+            keys = list(incoming.__annotations__.keys())
+        for key in keys:
+            if not hasattr(self,key):
+                setattr(self,key,incoming.__dict__[key])
+            elif overwrite and self.__dict__[key] != incoming.__dict__[key]:
+                setattr(self,key,incoming.__dict__[key])
+                
 
     def logError(self,msg='',kill=True):
         log(msg=f'\n\n{"*"*10} Error {"*"*10}\n{msg}\n',ln=False,fn=False,kill=kill,verbose=True)
