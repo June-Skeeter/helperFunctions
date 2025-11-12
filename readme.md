@@ -1,1 +1,1 @@
-A collection of functions to help with assorted tasks
+A collection of useful tools for data processing

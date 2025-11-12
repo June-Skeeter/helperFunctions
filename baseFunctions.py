@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from .parseCoordinates import parseCoordinates
 from .dictFuncs import dcToDict,loadDict,saveDict
+from inspect import currentframe
 from .log import log
 import os
 
@@ -57,12 +58,11 @@ class baseFunctions:
             self.logError(f'Root path {root} exists amd is not empty but is missing {fn}. Please check.')
     
     def saveToYaml(self,repr=True,inheritance=False):
-        print(type(self).__name__)
+        self.logWarning(type(self).__name__)
         if hasattr(self,'header'):
             header=self.header
         else:
             header=None
-        # print('\n\n',self.yamlConfigFile,'\n\n')
         saveDict(
             dcToDict(self,repr=True,inheritance=False),
             fileName=self.yamlConfigFile,
@@ -82,19 +82,19 @@ class baseFunctions:
                 setattr(self,key,incoming.__dict__[key])
                 
 
-    def logError(self,msg='',kill=True):
-        log(msg=f'\n\n{"*"*10} Error {"*"*10}\n{msg}\n',ln=False,fn=False,kill=kill,verbose=True)
+    def logError(self,msg='',ln=True,fn=True,kill=True):
+        log(msg=f'\n\n{"*"*11} Error {"*"*11}\n{msg}\n{"*"*10} Exiting {"*"*10}\n',ln=ln,fn=fn,kill=kill,verbose=True,cf=currentframe())
 
     def logWarning(self,msg='',hold=False,ln=False,fn=False):
         if hold == True:
             self.message = '\n'.join([self.message, msg])
         else:
             self.message = '\n'.join([self.message, msg])
-            log(msg=f'\n\n{"*"*10} Warning {"*"*10}\n{self.message}\n',ln=ln,fn=fn,verbose=True)
+            log(msg=f'\n\n{"*"*10} Warning {"*"*10}\n{self.message}\n',ln=ln,fn=fn,verbose=True,cf=currentframe())
             self.message = ''
 
     def logChoice(self,msg,proceed='Y'):
-        log(msg=msg,)
+        log(msg=msg,cf=currentframe())
         i = input(f'Enter {proceed} to continue or any other key to exit: ')
         if i == proceed:
             return
