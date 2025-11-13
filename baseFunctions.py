@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from .parseCoordinates import parseCoordinates
 from .dictFuncs import dcToDict,loadDict,saveDict
+from datetime import datetime, timezone
+import dateparser
 from inspect import currentframe
 from .log import log
 import os
@@ -24,7 +26,13 @@ class baseFunctions:
                 current_type = type(self.__dict__[name])
                 if self.verbose:
                     self.logWarning(f"\nType mismatch for field: `{name}`\nExpected input of {field_type.__name__}, received input of {current_type.__name__}\nAttempting to coerce value: {self.__dict__[name]}",hold=True)
-                if hasattr(field_type, '__module__') and field_type.__module__ == 'builtins':
+                if field_type == datetime:
+                    # self.logWarning('Auto parsing date, will assume format: YMD order and UTC time (unless specified)')
+                    TIMESTAMP = dateparser.parse(self.__dict__[name],settings={'DATE_ORDER':'YMD',
+                                       'RETURN_AS_TIMEZONE_AWARE':True})
+                    setattr(self, name, TIMESTAMP)
+                    self.logWarning(f'Confirm variable coerced correctly: {self.__dict__[name]}')
+                elif hasattr(field_type, '__module__') and field_type.__module__ == 'builtins':
                     try:
                         if name in parseCoordinates.__annotations__.keys():
                             pC = parseCoordinates(**{name:self.__dict__[name]})
@@ -36,7 +44,7 @@ class baseFunctions:
                     except:
                         self.logError(f"The field `{name}` was assigned by `{current_type.__name__}` instead of `{field_type.__name__}` and could not be coerced to required type.")
                 elif self.verbose:
-                    self.logError('Cannot coerce custom type')
+                    self.logError(f'Coercion failed for {name} \nCannot custom type: {field_type}')
             if 'options' in field.metadata:
                 if self.__dict__[name] not in field.metadata['options']:
                     self.logError(msg=f'{name} must be one of {field.metadata["options"]}')
@@ -48,7 +56,7 @@ class baseFunctions:
         root,fn = os.path.split(self.yamlConfigFile)
         if os.path.exists(self.yamlConfigFile):
             self.logAction(f'Loading: {self.yamlConfigFile}')
-            tmp,self.header = loadDict(fileName=self.yamlConfigFile)
+            tmp,self.header = loadDict(fileName=self.yamlConfigFile,returnHeader=True)
             for key,value in tmp.items():
                 if self.__dict__[key] is None:
                     setattr(self,key,value)
@@ -69,10 +77,13 @@ class baseFunctions:
             header=header
         )
         
-    def snycAttributes(self,incoming,inheritance=False,overwrite=False):
-        # Add attributes of one class to another and avoid ciruclar imports
+    def syncAttributes(self,incoming,inheritance=False,overwrite=False):
+        excl = baseFunctions.__dataclass_fields__.keys()
+        # Add attributes of one class to another and avoid circular imports
+        self.logWarning(msg=f'Syncing {type(incoming).__name__} into {type(self).__name__}',ln=True)
         if inheritance:
-            keys = list(incoming.__dataclass_fields__.keys())
+            keys = [k for k in list(incoming.__dict__.keys())
+                    if k not in excl]
         else:
             keys = list(incoming.__annotations__.keys())
         for key in keys:
@@ -80,7 +91,7 @@ class baseFunctions:
                 setattr(self,key,incoming.__dict__[key])
             elif overwrite and self.__dict__[key] != incoming.__dict__[key]:
                 setattr(self,key,incoming.__dict__[key])
-                
+               
 
     def logError(self,msg='',ln=True,fn=True,kill=True):
         log(msg=f'\n\n{"*"*11} Error {"*"*11}\n{msg}\n{"*"*10} Exiting {"*"*10}\n',ln=ln,fn=fn,kill=kill,verbose=True,cf=currentframe())

@@ -15,8 +15,6 @@ ymlStartMarker = '\n---\n'
 # 2. inheritance:
 #   * True - include inherited fields
 #   * False - exclude inherited fields
-
-
 def dcToDict(dc,repr=None,inheritance=True):
     if inheritance:
         if repr:
@@ -35,7 +33,7 @@ def dcToDict(dc,repr=None,inheritance=True):
 
 # Load a dictionary a .json or .yml file
 # Preserve the header in a yaml file if desired
-def loadDict(fileName,template = {},header=None,verbose=False,ln=False):
+def loadDict(fileName,template = {},returnHeader=False,verbose=False,ln=False):
     fileName = os.path.abspath(fileName)
     if os.path.isfile(fileName):
         if fileName.endswith('.yml') or fileName.endswith('.yaml'):
@@ -51,17 +49,23 @@ def loadDict(fileName,template = {},header=None,verbose=False,ln=False):
         elif fileName.endswith('.json'):
             with open(fileName) as file:
                 out = json.load(file)
+                header = None
         else:
             log(f'File format not supported for {fileName}',kill=True)
     else:
-        try:
-            log(f"Does not exist:\n{fileName}\nCreating new file using default or user-provided template:\n{template}",ln=ln,verbose=verbose)
-        except:
-            log(f"Does not exist:\n{fileName}\nCreating new file using default or user-provided template:\n",ln=ln,verbose=verbose)
-            pass
-        out = copy.deepcopy(template)
-        saveDict(out,fileName)
-    return(out,header)
+        
+        log(f'Does not exist:\n {fileName}',kill=True)
+        # try:
+        #     log(f"Does not exist:\n{fileName}\nCreating new file using default or user-provided template:\n{template}",ln=ln,verbose=verbose)
+        # except:
+        #     log(f"Does not exist:\n{fileName}\nCreating new file using default or user-provided template:\n",ln=ln,verbose=verbose)
+        #     pass
+        # out = copy.deepcopy(template)
+        # saveDict(out,fileName)
+    if returnHeader:
+        return(out,header)
+    else:
+        return(out)
 
 # Save a dictionary to json or yaml format
 # Preserve yaml header if desired
