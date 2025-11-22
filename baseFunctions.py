@@ -1,7 +1,8 @@
 import dataclasses
+import inspect
 from dataclasses import dataclass, field, MISSING
 from typing import Iterable
-from .parseCoordinates import parseCoordinates
+# from .parseCoordinates import parseCoordinates
 from .dictFuncs import dcToDict,loadDict,saveDict
 from datetime import datetime, timezone
 import dateparser
@@ -23,48 +24,60 @@ class baseFunctions:
     logFile: str = field(default=f"Log file: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",repr=False)
     preserveInheritedMetadata: bool = field(default=False,repr=False)
 
+
+    @classmethod
+    def from_dict(cls, env):  
+        # Source - https://stackoverflow.com/a/55096964
+        # Posted by Arne, modified by community. See post 'Timeline' for change history
+        # Retrieved 2025-11-21, License - CC BY-SA 4.0    
+        return cls(**{
+            k: v for k, v in env.items() 
+            if k in inspect.signature(cls).parameters
+        })
+
+
     def __post_init__(self,debug=False):
+        if hasattr(self, '__pre_init__'):
+            self.__pre_init__()
         if self.yamlConfigFile:
             self.loadFromYaml()
-        if not self.typeCheck:
-            return
-        for (name, field) in self.__dataclass_fields__.items():
-            self.typeEnforcement(name,field)
-            self.checkMetadata(name,field)
+        if self.typeCheck:
+            for (name, field) in self.__dataclass_fields__.items():
+                value = getattr(self, name, None)
+                self.typeEnforcement(name,value,field)
+                self.checkMetadata(name,value,field)
+        for k in baseFunctions.__annotations__.keys():
+            if k in self.__dict__.keys():
+                self.__dict__.pop(k)
 
         
-    def typeEnforcement(self,name,field):
+    def typeEnforcement(self,name,value,field):
         field_type = field.type
-        if not isinstance(self.__dict__[name], field_type) and self.__dict__[name] is not None:
-            current_type = type(self.__dict__[name])
+        if not isinstance(value, field_type) and value is not None:
+            current_type = type(value)
             if self.verbose:
-                self.logWarning(f"\nType mismatch for field: `{name}`\nExpected input of {field_type.__name__}, received input of {current_type.__name__}\nAttempting to coerce value: {self.__dict__[name]}",hold=True)
+                self.logWarning(f"\nType mismatch for field: `{name}`\nExpected input of {field_type.__name__}, received input of {current_type.__name__}\nAttempting to coerce value: {value}",hold=True)
             if field_type == datetime:
                 # self.logWarning('Auto parsing date, will assume format: YMD order and UTC time (unless specified)')
-                TIMESTAMP = dateparser.parse(self.__dict__[name],settings={'DATE_ORDER':'YMD',
+                TIMESTAMP = dateparser.parse(value,settings={'DATE_ORDER':'YMD',
                                     'RETURN_AS_TIMEZONE_AWARE':True})
                 setattr(self, name, TIMESTAMP)
-                self.logWarning(f'Confirm variable coerced correctly: {self.__dict__[name]}')
+                self.logWarning(f'Confirm variable coerced correctly: {value}')
             elif hasattr(field_type, '__module__') and field_type.__module__ == 'builtins':
                 try:
-                    if name in parseCoordinates.__annotations__.keys():
-                        pC = parseCoordinates(**{name:self.__dict__[name]})
-                        self.__dict__[name] = pC.__dict__[name]
-                        self.logWarning(f'Confirm coordinate parsed correctly: {self.__dict__[name]}')
-                    else:
-                        setattr(self, name,  field_type(self.__dict__[name]))
-                        if not current_type is int and not field_type is float:
-                            self.logWarning(f'Confirm variable coerced correctly: {self.__dict__[name]}')
+                    setattr(self, name,  field_type(value))
+                    if not current_type is int and not field_type is float:
+                        self.logWarning(f'Confirm variable coerced correctly: {value}')
                 except:
                     self.logError(f"The field `{name}` was assigned by `{current_type.__name__}` instead of `{field_type.__name__}` and could not be coerced to required type.")
             elif dataclasses.is_dataclass(self.__dataclass_fields__[name].default_factory):
                 self.logMessage(f'Parsing nested dataclass: {name}')
-                setattr(self,name,self.__dataclass_fields__[name].default_factory(**self.__dict__[name]))
+                setattr(self,name,self.__dataclass_fields__[name].default_factory(**value))
             elif self.verbose:
                 breakpoint()
                 self.logError(f'Coercion failed for {name} \nCannot coerce custom type: {field_type}')
     
-    def checkMetadata(self,name,field):
+    def checkMetadata(self,name,value,field):
         if self.preserveInheritedMetadata:
             # Ensure metadata are not overwrittent 
             middleClasses = [mc for mc in type(self).__mro__[1:-2]]
@@ -74,11 +87,11 @@ class baseFunctions:
                         self.__dataclass_fields__[key].metadata = mc.__dataclass_fields__[key].metadata
         if 'options' in field.metadata:
             if isinstance(field.metadata['options'],Iterable):
-                if self.__dict__[name] not in field.metadata['options']:
-                    self.logWarning(f"{self.__dict__[name]} is not valid")
+                if value not in field.metadata['options']:
+                    self.logWarning(f"{value} is not valid")
                     self.logError(msg=f'{name} must be one of {field.metadata["options"]}')
             else:
-                if self.__dict__[name] != field.metadata['options']:
+                if value != field.metadata['options']:
                     self.logError(msg=f'{name} must be {field.metadata["options"]}')
 
     def loadFromYaml(self):
@@ -118,13 +131,13 @@ class baseFunctions:
             header=header
         )
 
-    def newField(self,name,value,kwargs={}):
-        self.logWarning('Adding new dataclass dependency')
-        self.__dataclass_fields__[name] = field(default_factory=value(**kwargs))
-        self.__dataclass_fields__[name].name = name
-        self.__dataclass_fields__[name].type = type(value)
-        self.__annotations__[name] = type(value)
-        self.__dict__[name] = self.__dataclass_fields__[name].default_factory
+    # def newField(self,name,value,kwargs={}):
+    #     self.logWarning('Adding new dataclass dependency')
+    #     self.__dataclass_fields__[name] = field(default_factory=value(**kwargs))
+    #     self.__dataclass_fields__[name].name = name
+    #     self.__dataclass_fields__[name].type = type(value)
+    #     self.__annotations__[name] = type(value)
+    #     self.__dict__[name] = self.__dataclass_fields__[name].default_factory
         
     def syncAttributes(self,incoming,inheritance=False,overwrite=False):
         excl = baseFunctions.__dataclass_fields__.keys()

@@ -73,7 +73,7 @@ class utmCoordinates:
 
 @dataclass(kw_only=True)
 class parseCoordinates:
-    ID:list = 'ID'
+    UID: list = 'UID'
     latitude: list = None
     longitude: list = None
     attributes: dict = field(default_factory=lambda:{},repr=False)
@@ -82,12 +82,12 @@ class parseCoordinates:
     geodataframe: gpd.GeoDataFrame = field(default_factory=lambda:gpd.GeoDataFrame(),repr=False)
     
     def __post_init__(self):
-        self.geographicCoordinates = geographicCoordinates(latitude=self.latitude,longitude=self.longitude,datum=self.datum)
-        self.latitude,self.longitude=self.geographicCoordinates.latitude,self.geographicCoordinates.longitude
         if not self.latitude or not self.longitude:
             return
+        self.geographicCoordinates = geographicCoordinates(latitude=self.latitude,longitude=self.longitude,datum=self.datum)
+        self.latitude,self.longitude=self.geographicCoordinates.latitude,self.geographicCoordinates.longitude
         self.UTM = utmCoordinates(latitude=self.latitude,longitude=self.longitude,datum=self.datum)
-        self.geodataframe = gpd.GeoDataFrame(index=[self.ID],
+        self.geodataframe = gpd.GeoDataFrame(index=[self.UID],
                                              data=self.attributes,
                                              geometry=gpd.points_from_xy([self.UTM.x],[self.UTM.y]),
                                              crs=self.UTM.EPSG)
@@ -95,7 +95,7 @@ class parseCoordinates:
             "type": "FeatureCollection",
             "features": [{
                 "type": "Feature",
-                "properties": {"ID": self.ID}|self.attributes,
+                "properties": {"UID": self.UID}|self.attributes,
                 "geometry": {"type": "Point","coordinates": [self.longitude, self.latitude]}
                 },
                 ]}
