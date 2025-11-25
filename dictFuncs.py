@@ -15,21 +15,53 @@ ymlStartMarker = '\n---\n'
 # 2. inheritance:
 #   * True - include inherited fields
 #   * False - exclude inherited fields
-def dcToDict(dc,repr=None,inheritance=True):
+# 3. keepNull
+#   * True - include all values
+#   * False - exclude values if they are None
+
+def dcToDict(dc,repr=None,inheritance=True,keepNull=True):
     if inheritance:
         if repr:
-            return({k:v for k,v in dc.__dict__.items() if k in dc.__dataclass_fields__ and dc.__dataclass_fields__[k].repr})
+            return({
+                k:v for k,v in dc.__dict__.items()
+                if k in dc.__dataclass_fields__ and 
+                dc.__dataclass_fields__[k].repr and
+                (keepNull or v is not None)
+                })
         elif repr is None:
-            return({k:v for k,v in dc.__dict__.items() if k in dc.__dataclass_fields__})
+            return({
+                k:v for k,v in dc.__dict__.items() 
+                if k in dc.__dataclass_fields__ and
+                (keepNull or v is not None)
+                })
         else:
-            return({k:v for k,v in dc.__dict__.items() if k in dc.__dataclass_fields__ and not dc.__dataclass_fields__[k].repr})
+            return({
+                k:v for k,v in dc.__dict__.items() 
+                if k in dc.__dataclass_fields__ and
+                not dc.__dataclass_fields__[k].repr and
+                (keepNull or v is not None)
+                })
     else:
         if repr:
-            return({k:dc.__dict__[k] for k in dc.__annotations__.keys() if k in dc.__dataclass_fields__ and dc.__dataclass_fields__[k].repr})
+            return({
+                k:dc.__dict__[k] for k in dc.__annotations__.keys()
+                if k in dc.__dataclass_fields__ and
+                dc.__dataclass_fields__[k].repr and
+                (keepNull or dc.__dict__[k] is not None)
+                })
         elif repr is None:
-            return({k:dc.__dict__[k] for k in dc.__annotations__.keys() if k in dc.__dataclass_fields__})
+            return({
+                k:dc.__dict__[k] for k in dc.__annotations__.keys()
+                if k in dc.__dataclass_fields__ and
+                (keepNull or dc.__dict__[k] is not None)
+                })
         else:
-            return({k:dc.__dict__[k] for k in dc.__annotations__.keys() if k in dc.__dataclass_fields__ and not dc.__dataclass_fields__[k].repr})
+            return({
+                k:dc.__dict__[k] for k in dc.__annotations__.keys()
+                if k in dc.__dataclass_fields__ and
+                not dc.__dataclass_fields__[k].repr and
+                (keepNull or dc.__dict__[k] is not None)
+                })
 
 # Load a dictionary a .json or .yml file
 # Preserve the header in a yaml file if desired
