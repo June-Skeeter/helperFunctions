@@ -34,7 +34,7 @@ class baseClass:
             if k in inspect.signature(cls).parameters
         })
 
-    def __post_init__(self,debug=False):
+    def __post_init__(self):
         if self.typeCheck:
             for (name, field) in self.__dataclass_fields__.items():
                 value = getattr(self, name, None)
@@ -70,12 +70,15 @@ class baseClass:
     
     def checkMetadata(self,name,value,field):
         if self.preserveInheritedMetadata:
-            # Ensure metadata are not overwrittent 
-            middleClasses = [mc for mc in type(self).__mro__[1:-2]]
-            for mc in middleClasses:
-                for key in mc.__annotations__.keys():
-                    if type(self.__dataclass_fields__[name].metadata).__name__ == 'mappingproxy':
-                        self.__dataclass_fields__[key].metadata = mc.__dataclass_fields__[key].metadata
+            # Ensure metadata are not overwritten 
+            if type(self.__dataclass_fields__[name].metadata).__name__ == 'mappingproxy':
+                middleClasses = [mc for mc in type(self).__mro__[1:-2]]
+                for mc in middleClasses:
+                    if name in mc.__annotations__.keys():
+                        try:
+                            self.__dataclass_fields__[name].metadata = mc.__dataclass_fields__[name].metadata
+                        except:
+                            breakpoint()
         if 'options' in field.metadata:
             if isinstance(field.metadata['options'],Iterable):
                 pass
@@ -115,8 +118,12 @@ class baseClass:
         elif os.path.isdir(root) and os.listdir(root) != []:
             self.logError(f'Root path {root} exists amd is not empty but is missing {fn}. Please check.')
 
+    def toConfig(self,repr=True,inheritance=True,keepNull=True):
+        return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull))
+
+
     def saveConfigFile(self,repr=True,inheritance=True,keepNull=True):
-        configDict = dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull)
+        configDict = self.toConfig(self,repr=repr,inheritance=inheritance,keepNull=keepNull)
         if not self.configFile:
             self.logMessage('No filepath provided, only returning config dictionary')
         else:
@@ -130,8 +137,7 @@ class baseClass:
                 fileName=self.configFile,
                 header=header
             )
-        return(configDict)
-            
+
     def syncAttributes(self,incoming,inheritance=False,overwrite=False):
         excl = baseClass.__dataclass_fields__.keys()
         # Add attributes of one class to another and avoid circular imports
@@ -189,3 +195,17 @@ class baseClass:
 
     def updateLog(self,out):
         self.logFile=self.logFile+'\n\n'+out
+
+
+    @classmethod
+    def template(cls):
+        template = {}
+        for k,v in cls.__dataclass_fields__.items():
+            if v.repr:
+                desc = {'datatype':v.type.__name__,}
+                if 'description' in v.metadata:
+                    desc['description'] = v.metadata['description']
+                if 'options' in v.metadata:
+                    desc['options'] = v.metadata['options']
+                template[k] = desc
+        return(template)
