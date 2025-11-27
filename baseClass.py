@@ -115,20 +115,23 @@ class baseClass:
         elif os.path.isdir(root) and os.listdir(root) != []:
             self.logError(f'Root path {root} exists amd is not empty but is missing {fn}. Please check.')
 
-    def saveConfigFile(self,repr=True,inheritance=True):
-        self.logMessage(f"Saving: {self.configFile}")
-        if repr: keys = list(self.__annotations__.keys())
-        else: keys = list(self.__dataclass_fields__.keys())
-        if hasattr(self,'header'):
-            header=self.header
+    def saveConfigFile(self,repr=True,inheritance=True,keepNull=True):
+        configDict = dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull)
+        if not self.configFile:
+            self.logMessage('No filepath provided, only returning config dictionary')
         else:
-            header=None
-        saveDict(
-            dcToDict(self,repr=repr,inheritance=inheritance),
-            fileName=self.configFile,
-            header=header
-        )
-        
+            self.logMessage(f"Saving: {self.configFile}")
+            if hasattr(self,'header'):
+                header=self.header
+            else:
+                header=None
+            saveDict(
+                configDict,
+                fileName=self.configFile,
+                header=header
+            )
+        return(configDict)
+            
     def syncAttributes(self,incoming,inheritance=False,overwrite=False):
         excl = baseClass.__dataclass_fields__.keys()
         # Add attributes of one class to another and avoid circular imports

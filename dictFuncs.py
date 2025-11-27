@@ -2,16 +2,18 @@
 import os
 import yaml
 import json
-import copy
+from typing import Iterable
 from .log import log
 ymlStartMarker = '\n---\n'
 
 # Convert a dataclass to a dictionary
-# Default settings will give same as built in __dict__
+# Can give similar output as built in __dict__ if run with (repr=False) but modified order (child fields before parent fields)
+# Or give more advanced output by excluding fields based on field properites
+# For now, does not resolve MRO beyond first parent, all ineherited fields will follow default order
 # Options:
 # 1. repr:
-#   * None - do not filter by repr
-#   * True/False  - only output where repr == True/False
+#   * False - do not filter by repr
+#   * True  - only output
 # 2. inheritance:
 #   * True - include inherited fields
 #   * False - exclude inherited fields
@@ -19,49 +21,63 @@ ymlStartMarker = '\n---\n'
 #   * True - include all values
 #   * False - exclude values if they are None
 
-def dcToDict(dc,repr=None,inheritance=True,keepNull=True):
-    if inheritance:
-        if repr:
-            return({
-                k:v for k,v in dc.__dict__.items()
-                if k in dc.__dataclass_fields__ and 
-                dc.__dataclass_fields__[k].repr and
-                (keepNull or v is not None)
-                })
-        elif repr is None:
-            return({
-                k:v for k,v in dc.__dict__.items() 
-                if k in dc.__dataclass_fields__ and
-                (keepNull or v is not None)
-                })
-        else:
-            return({
-                k:v for k,v in dc.__dict__.items() 
-                if k in dc.__dataclass_fields__ and
-                not dc.__dataclass_fields__[k].repr and
-                (keepNull or v is not None)
-                })
+def dcToDict(dc,repr=True,inheritance=True,keepNull=True,invert=False):
+    if invert:
+        order = -1
     else:
-        if repr:
-            return({
-                k:dc.__dict__[k] for k in dc.__annotations__.keys()
-                if k in dc.__dataclass_fields__ and
-                dc.__dataclass_fields__[k].repr and
-                (keepNull or dc.__dict__[k] is not None)
-                })
-        elif repr is None:
-            return({
-                k:dc.__dict__[k] for k in dc.__annotations__.keys()
-                if k in dc.__dataclass_fields__ and
-                (keepNull or dc.__dict__[k] is not None)
-                })
+        order = 1
+    fields = dc.__dataclass_fields__
+    # Keys of child class
+    if inheritance:
+        # Keys of child and all parent classes in order of MRO
+        outputKeys = [n for m in type(dc).__mro__ if hasattr(m,'__annotations__') for n in m.__annotations__ ][::order]
+    else:
+        # Only child keys
+        outputKeys = list(dc.__annotations__)[::order]
+    
+    outputValues = [getattr(dc, k) for k in outputKeys
+                    if hasattr(dc, k)]
+
+    cleanOutput = {
+        k: getattr(dc, k) for k in outputKeys
+        if hasattr(dc, k) and
+        (keepNull or getattr(dc, k) is not None) and # Apply null filter if applicable
+        (fields[k].repr or not repr) # Apply repr filter if applicable
+    }
+    # Move iterables to back to increase readability of yaml files
+    toBack = {}
+    toFront = {}
+    for key,value in cleanOutput.items():
+        if type(value) is not str and isinstance(value,Iterable):
+            toBack[key] = value
         else:
-            return({
-                k:dc.__dict__[k] for k in dc.__annotations__.keys()
-                if k in dc.__dataclass_fields__ and
-                not dc.__dataclass_fields__[k].repr and
-                (keepNull or dc.__dict__[k] is not None)
-                })
+            toFront[key] = value
+    finalOutput = toFront | toBack
+    return finalOutput
+
+
+
+
+    # if repr:
+    #     return({
+    #         k:dc.__dict__[k] for k in outputKeys
+    #         if k in dc.__dataclass_fields__ and 
+    #         dc.__dataclass_fields__[k].repr and
+    #         (keepNull or dc.__dict__[k] is not None)
+    #         })
+    # elif repr is None:
+    #     return({
+    #         k:dc.__dict__[k] for k in outputKeys
+    #         if k in dc.__dataclass_fields__ and
+    #         (keepNull or dc.__dict__[k] is not None)
+    #         })
+    # else:
+    #     return({
+    #         k:dc.__dict__[k] for k in outputKeys
+    #         if k in dc.__dataclass_fields__ and
+    #         not dc.__dataclass_fields__[k].repr and
+    #         (keepNull or dc.__dict__[k] is not None)
+    #         })
 
 # Load a dictionary a .json or .yml file
 # Preserve the header in a yaml file if desired
