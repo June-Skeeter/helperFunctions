@@ -22,7 +22,7 @@ class baseClass:
     message: str = field(default='',repr=False)
     logFile: str = field(default=f"Log file: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",repr=False)
     preserveInheritedMetadata: bool = field(default=True,repr=False)
-
+    keepNull: bool = field(default=True,repr=False)
 
     @classmethod
     def from_dict(cls, env):  
@@ -118,7 +118,9 @@ class baseClass:
         elif os.path.isdir(root) and os.listdir(root) != []:
             self.logError(f'Root path {root} exists amd is not empty but is missing {fn}. Please check.')
 
-    def toConfig(self,repr=True,inheritance=True,keepNull=True):
+    def toConfig(self,repr=True,inheritance=True,keepNull=None):
+        if keepNull is None:
+            keepNull = self.keepNull
         return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull))
 
 
