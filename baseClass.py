@@ -102,15 +102,13 @@ class baseClass:
         ]
         root,fn = os.path.split(self.configFile)
         if os.path.exists(self.configFile):
-            self.logMessage(f'Loading: {self.configFile}')
+            self.logMessage(f'Loading: {self.configFile}\nNote: Disabled typeChecking when reading from yaml')
             tmp,self.header = loadDict(fileName=self.configFile,returnHeader=True)
             for key,value in tmp.items():
                 # Overwrite defaults
                 if key not in self.__dict__.keys():
                     self.logError('Does not accept generic undefined parameters, must edit source code')
                 else:
-                    self.logWarning('Disabled typeChecking when reading from yaml')
-                    print(key,value)
                     setattr(self,key,value)
                 # elif (
                 #     self.__dict__[key] == self.__dataclass_fields__[key].default or (
