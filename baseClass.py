@@ -35,13 +35,16 @@ class baseClass:
         })
 
     def __post_init__(self):
-        if self.typeCheck:
-            for (name, field) in self.__dataclass_fields__.items():
-                value = getattr(self, name, None)
-                self.typeEnforcement(name,value,field)
-                self.checkMetadata(name,value,field)
         if self.configFile:
             self.loadFromConfigFile()
+        if self.typeCheck:
+            self.inspectFields()
+        
+    def inspectFields(self):
+        for (name, field) in self.__dataclass_fields__.items():
+            value = getattr(self, name, None)
+            self.typeEnforcement(name,value,field)
+            self.checkMetadata(name,value,field)
             
     def typeEnforcement(self,name,value,field):
         field_type = field.type
@@ -65,6 +68,8 @@ class baseClass:
             elif dataclasses.is_dataclass(self.__dataclass_fields__[name].default_factory):
                 self.logMessage(f'Parsing nested dataclass: {name}')
                 setattr(self,name,self.__dataclass_fields__[name].default_factory(**value))
+            elif dataclasses.is_dataclass(value) and hasattr(value,'toConfig'):
+                setattr(self,name,value.toConfig())               
             elif self.verbose:
                 self.logError(f'Coercion failed for {name} \nCannot coerce custom type: {field_type}')
     
@@ -103,20 +108,24 @@ class baseClass:
                 # Overwrite defaults
                 if key not in self.__dict__.keys():
                     self.logError('Does not accept generic undefined parameters, must edit source code')
-                elif (
-                    self.__dict__[key] == self.__dataclass_fields__[key].default or (
-                        self.__dataclass_fields__[key].default_factory is not MISSING and 
-                        self.__dict__[key] == self.__dataclass_fields__[key].default_factory())
-                    ):
+                else:
+                    self.logWarning('Disabled typeChecking when reading from yaml')
+                    print(key,value)
                     setattr(self,key,value)
-                elif self.__dict__[key] != value and key not in defaultOverwrites:
-                    if isinstance(self.__dict__[key], Iterable):
-                        pass
-                        # self.logWarning(f'User input for {key} may differ from what already exists in {self.configFile}.  Confirm correct parameters.')
-                    else:
-                        self.logChoice(f'User input for {key}:{self.__dict__[key]} does not match the configuration in \n{self.configFile}\n proceeding will overwrite ')
+                # elif (
+                #     self.__dict__[key] == self.__dataclass_fields__[key].default or (
+                #         self.__dataclass_fields__[key].default_factory is not MISSING and 
+                #         self.__dict__[key] == self.__dataclass_fields__[key].default_factory())
+                #     ):
+                #     setattr(self,key,value)
+                # elif self.__dict__[key] != value and key not in defaultOverwrites:
+                #     if isinstance(self.__dict__[key], Iterable):
+                #         self.logWarning(f'User input for {key} may differ from what already exists in {self.configFile}.  Confirm correct parameters.')
+                #     else:
+                #         self.logChoice(f'User input for {key}:{self.__dict__[key]} does not match the configuration in \n{self.configFile}\n proceeding will overwrite ')
         elif os.path.isdir(root) and os.listdir(root) != []:
             self.logError(f'Root path {root} exists amd is not empty but is missing {fn}. Please check.')
+        
 
     def toConfig(self,repr=True,inheritance=True,keepNull=None):
         if keepNull is None:
@@ -125,7 +134,7 @@ class baseClass:
 
 
     def saveConfigFile(self,repr=True,inheritance=True,keepNull=True):
-        configDict = self.toConfig(self,repr=repr,inheritance=inheritance,keepNull=keepNull)
+        configDict = self.toConfig(repr=repr,inheritance=inheritance,keepNull=keepNull)
         if not self.configFile:
             self.logMessage('No filepath provided, only returning config dictionary')
         else:

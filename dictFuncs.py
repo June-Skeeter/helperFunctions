@@ -21,19 +21,15 @@ ymlStartMarker = '\n---\n'
 #   * True - include all values
 #   * False - exclude values if they are None
 
-def dcToDict(dc,repr=True,inheritance=True,keepNull=True,invert=False):
-    if invert:
-        order = -1
-    else:
-        order = 1
+def dcToDict(dc,repr=True,inheritance=True,keepNull=True):
     fields = dc.__dataclass_fields__
     # Keys of child class
     if inheritance:
-        # Keys of child and all parent classes in order of MRO
-        outputKeys = [n for m in type(dc).__mro__ if hasattr(m,'__annotations__') for n in m.__annotations__ ][::order]
+        # Keys of child and all parent classes with inverse order of MRO (children last)
+        outputKeys = [n for m in type(dc).__mro__[::-1] if hasattr(m,'__annotations__') for n in list(m.__annotations__)]        
     else:
         # Only child keys
-        outputKeys = list(dc.__annotations__)[::order]
+        outputKeys = list(dc.__annotations__)
     
     outputValues = [getattr(dc, k) for k in outputKeys
                     if hasattr(dc, k)]
