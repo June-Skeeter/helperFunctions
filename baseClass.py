@@ -17,12 +17,22 @@ import os
 @dataclass
 class baseClass:
     verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
-    configFile: str = field(default=None,repr=False) # If valid yaml file path is provided, the dataclass will read from the file
+
     typeCheck: bool = field(default=True,repr=False)
     message: str = field(default='',repr=False)
     logFile: str = field(default=f"Log file: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",repr=False)
-    preserveInheritedMetadata: bool = field(default=True,repr=False)
     keepNull: bool = field(default=True,repr=False)
+
+    configFilePath: str = field(default=None,repr=False) # If valid yaml file path is provided, the dataclass will read from the file
+    configFileRoot: str = field(default=None,repr=False) # If valid yaml file path is provided, the dataclass will read from the file
+    configFileName: str = field(default=None,repr=False) # If valid yaml file path is provided, the dataclass will read from the file
+    configFileExtension: str = field(default='.yml',repr=False)
+    configFileExists: bool = field(default=True,repr=False)
+
+    safeMode: bool = field(default=True,repr=False) # Only write config if safemode == False or configFileExists=False
+
+    
+    _preserveInheritedMetadata: bool = field(default=True,repr=False)
 
     @classmethod
     def from_dict(cls, env):  
@@ -35,10 +45,26 @@ class baseClass:
         })
 
     def __post_init__(self):
-        if self.configFile:
-            self.loadFromConfigFile()
-        if self.typeCheck:
-            self.inspectFields()
+        if type(self).__name__ != 'baseClass':
+            self.logMessage(f"Running: {type(self)}")
+            if self.configFilePath is None and (
+                self.configFileRoot is not None and self.configFileName is not None):
+                if '.' not in self.configFileName:
+                    self.configFileName = self.configFileName+self.configFileExtension
+                self.configFilePath = os.path.join(self.configFileRoot,self.configFileName)
+            if self.configFilePath:
+                self.loadFromConfigFile()
+            else:
+                self.configFileExists = False
+            if self.typeCheck:
+                self.inspectFields()
+
+        
+    def close(self):
+        if not self.safeMode or not self.configFileExists:
+            self.saveConfigFile()
+        if self.verbose is False:
+            print(self.logFile)
         
     def inspectFields(self):
         for (name, field) in self.__dataclass_fields__.items():
@@ -58,6 +84,8 @@ class baseClass:
                                     'RETURN_AS_TIMEZONE_AWARE':True})
                 setattr(self, name, TIMESTAMP)
                 self.logWarning(f'Confirm variable coerced correctly: {value}')
+            elif dataclasses.is_dataclass(value) and hasattr(value,'toConfig'):
+                setattr(self,name,value.toConfig())               
             elif hasattr(field_type, '__module__') and field_type.__module__ == 'builtins':
                 try:
                     setattr(self, name,  field_type(value))
@@ -68,13 +96,11 @@ class baseClass:
             elif dataclasses.is_dataclass(self.__dataclass_fields__[name].default_factory):
                 self.logMessage(f'Parsing nested dataclass: {name}')
                 setattr(self,name,self.__dataclass_fields__[name].default_factory(**value))
-            elif dataclasses.is_dataclass(value) and hasattr(value,'toConfig'):
-                setattr(self,name,value.toConfig())               
             elif self.verbose:
                 self.logError(f'Coercion failed for {name} \nCannot coerce custom type: {field_type}')
     
     def checkMetadata(self,name,value,field):
-        if self.preserveInheritedMetadata:
+        if self._preserveInheritedMetadata:
             # Ensure metadata are not overwritten 
             if type(self.__dataclass_fields__[name].metadata).__name__ == 'mappingproxy':
                 middleClasses = [mc for mc in type(self).__mro__[1:-2]]
@@ -104,14 +130,18 @@ class baseClass:
         defaultOverwrites = [
             'dateModified'
         ]
-        root,fn = os.path.split(self.configFile)
-        if os.path.exists(self.configFile):
-            tmp,self.header = loadDict(fileName=self.configFile,returnHeader=True)
+        if self.configFileRoot is None and self.configFileName is None:
+            self.configFileRoot, self.configFileName = os.path.split(self.configFilePath)
+        if os.path.exists(self.configFilePath):
+            tmp,self.header = loadDict(fileName=self.configFilePath,returnHeader=True)
             for key,value in tmp.items():
                 # Overwrite defaults
-                if key not in self.__dict__.keys():
+                self.logMessage(f"Reading: {self.configFilePath}")
+                if key not in self.__dataclass_fields__.keys():
                     self.logError(f'Does not accept generic undefined parameters, field {key} must be added to source code')
                 elif key in defaultOverwrites:
+                    setattr(self,key,value)
+                elif key not in self.__dict__.keys():
                     setattr(self,key,value)
                 elif value != self.__dict__[key]:
                     if (self.__dataclass_fields__[key].default == self.__dict__[key] or 
@@ -124,8 +154,10 @@ class baseClass:
                             self.logWarning(f'typeChecking issue when reading from yaml')
                             self.logChoice('Proceed with interactive debug session')
                             breakpoint()
-        elif os.path.isdir(root) and os.listdir(root) != []:
-            self.logError(f'Root path {root} exists amd is not empty but is missing {fn}. Please check.')
+            self.configFileExists = True
+        else:
+            # self.logMessage(f"{self.configFilePath} does not exist yet.")
+            self.configFileExists = False
         
 
     def toConfig(self,repr=True,inheritance=True,keepNull=None):
@@ -138,18 +170,18 @@ class baseClass:
         if verbose is None:
             verbose = self.verbose
         configDict = self.toConfig(repr=repr,inheritance=inheritance,keepNull=keepNull)
-        if not self.configFile:
+        if not self.configFilePath:
             self.logMessage('No filepath provided, only returning config dictionary')
         else:
-            if verbose:
-                self.logMessage(f"Saving: {self.configFile}")
+            self.logMessage(f"Saving: {self.configFilePath}")
             if hasattr(self,'header'):
                 header=self.header
             else:
                 header=None
+            
             saveDict(
                 configDict,
-                fileName=self.configFile,
+                fileName=self.configFilePath,
                 header=header
             )
 
@@ -209,7 +241,7 @@ class baseClass:
         return(out)
 
     def updateLog(self,out):
-        self.logFile=self.logFile+'\n\n'+out
+        self.logFile=self.logFile+'\n'+out
 
 
     @classmethod
