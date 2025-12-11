@@ -1,5 +1,7 @@
-import dataclasses
+import os
 import inspect
+import dataclasses
+from types import MappingProxyType
 from dataclasses import dataclass, field, MISSING
 from typing import Iterable
 # from .parseCoordinates import parseCoordinates
@@ -8,7 +10,6 @@ from datetime import datetime, timezone
 import dateparser
 from inspect import currentframe
 from .log import log
-import os
 
 # baseClass is a parent dataclass which gives enhanced functionality to dataclasses
 # * Supports type checking
@@ -16,11 +17,12 @@ import os
 
 @dataclass
 class baseClass:
+    UID: str = field(default=None,repr=False)
     verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
 
     typeCheck: bool = field(default=True,repr=False)
     message: str = field(default='',repr=False)
-    logFile: str = field(default=f"Log file: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",repr=False)
+    logFile: str = field(default=f"Log file: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}\n",repr=False)
     keepNull: bool = field(default=True,repr=False)
 
     configFilePath: str = field(default=None,repr=False) # If valid yaml file path is provided, the dataclass will read from the file
@@ -31,8 +33,9 @@ class baseClass:
 
     safeMode: bool = field(default=True,repr=False) # Only write config if safemode == False or configFileExists=False
 
+    # defaultMD: dict = field(default_factory=lambda:{'optional':True},init=False,repr=False)
     
-    _preserveInheritedMetadata: bool = field(default=True,repr=False)
+    _inheritedMetadata: bool = field(default=True,repr=False)
 
     @classmethod
     def from_dict(cls, env):  
@@ -63,8 +66,7 @@ class baseClass:
     def close(self):
         if not self.safeMode or not self.configFileExists:
             self.saveConfigFile()
-        if self.verbose is False:
-            print(self.logFile)
+        return (self.logFile)
         
     def inspectFields(self):
         for (name, field) in self.__dataclass_fields__.items():
@@ -76,16 +78,14 @@ class baseClass:
         field_type = field.type
         if not isinstance(value, field_type) and value is not None:
             current_type = type(value)
-            if self.verbose:
-                self.logWarning(f"\nType mismatch for field: `{name}`\nExpected input of {field_type.__name__}, received input of {current_type.__name__}\nAttempting to coerce value: {value}",hold=True)
+            self.logWarning(f"\nType mismatch for field: `{name}`\nExpected input of {field_type.__name__}, received input of {current_type.__name__}\nAttempting to coerce value: {value}",hold=True)
             if field_type == datetime:
                 # self.logWarning('Auto parsing date, will assume format: YMD order and UTC time (unless specified)')
-                TIMESTAMP = dateparser.parse(value,settings={'DATE_ORDER':'YMD',
-                                    'RETURN_AS_TIMEZONE_AWARE':True})
+                TIMESTAMP = dateparser.parse(value,settings={'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':True})
                 setattr(self, name, TIMESTAMP)
                 self.logWarning(f'Confirm variable coerced correctly: {value}')
-            elif dataclasses.is_dataclass(value) and hasattr(value,'toConfig'):
-                setattr(self,name,value.toConfig())               
+            elif dataclasses.is_dataclass(value) and hasattr(value,'to_dict'):
+                setattr(self,name,value.to_dict())               
             elif hasattr(field_type, '__module__') and field_type.__module__ == 'builtins':
                 try:
                     setattr(self, name,  field_type(value))
@@ -100,16 +100,19 @@ class baseClass:
                 self.logError(f'Coercion failed for {name} \nCannot coerce custom type: {field_type}')
     
     def checkMetadata(self,name,value,field):
-        if self._preserveInheritedMetadata:
+        if self._inheritedMetadata:
             # Ensure metadata are not overwritten 
-            if type(self.__dataclass_fields__[name].metadata).__name__ == 'mappingproxy':
+            if not field.metadata:
                 middleClasses = [mc for mc in type(self).__mro__[1:-2]]
                 for mc in middleClasses:
                     if name in mc.__annotations__.keys():
-                        try:
-                            self.__dataclass_fields__[name].metadata = mc.__dataclass_fields__[name].metadata
-                        except:
-                            self.logError('I dont remember why this is here?')
+                        self.__dataclass_fields__[name].metadata = mc.__dataclass_fields__[name].metadata
+            elif hasattr(self,'defaultMD'):
+                md = dict(field.metadata)
+                for k,v in self.defaultMD.items():
+                    if k not in md.keys():
+                        md[k] = v
+                self.__dataclass_fields__[name].metadata = MappingProxyType(md)
         if 'options' in field.metadata:
             if isinstance(field.metadata['options'],Iterable):
                 if value in field.metadata['options']:
@@ -133,10 +136,10 @@ class baseClass:
         if self.configFileRoot is None and self.configFileName is None:
             self.configFileRoot, self.configFileName = os.path.split(self.configFilePath)
         if os.path.exists(self.configFilePath):
+            self.logMessage(f"Reading: {self.configFilePath}")
             tmp,self.header = loadDict(fileName=self.configFilePath,returnHeader=True)
             for key,value in tmp.items():
                 # Overwrite defaults
-                self.logMessage(f"Reading: {self.configFilePath}")
                 if key not in self.__dataclass_fields__.keys():
                     self.logError(f'Does not accept generic undefined parameters, field {key} must be added to source code')
                 elif key in defaultOverwrites:
@@ -156,20 +159,17 @@ class baseClass:
                             breakpoint()
             self.configFileExists = True
         else:
-            # self.logMessage(f"{self.configFilePath} does not exist yet.")
             self.configFileExists = False
         
-
-    def toConfig(self,repr=True,inheritance=True,keepNull=None):
+    def to_dict(self,repr=True,inheritance=True,keepNull=None,majorOrder=1,minorOrder=1):
         if keepNull is None:
             keepNull = self.keepNull
-        return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull))
+        return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder))
 
-
-    def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,verbose=None):
+    def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,verbose=None,majorOrder=1,minorOrder=1):
         if verbose is None:
             verbose = self.verbose
-        configDict = self.toConfig(repr=repr,inheritance=inheritance,keepNull=keepNull)
+        configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder)
         if not self.configFilePath:
             self.logMessage('No filepath provided, only returning config dictionary')
         else:
@@ -178,7 +178,6 @@ class baseClass:
                 header=self.header
             else:
                 header=None
-            
             saveDict(
                 configDict,
                 fileName=self.configFilePath,
@@ -206,20 +205,20 @@ class baseClass:
             verbose = self.verbose
         out = log(msg=f'\n\n{"*"*11} Error {"*"*11}\n{msg}\n{"*"*10} Exiting {"*"*10}\n',traceback=traceback,kill=kill,cf=currentframe(),verbose=verbose)
         self.updateLog(out)
-        return(out)
+
 
     def logWarning(self,msg='',hold=False,traceback=False,verbose=None):
         if verbose is None:
             verbose = self.verbose
-        if hold == True:
-            self.message = '\n'.join([self.message, msg])
-            out = None
+        if self.message == '':
+            self.message = msg
         else:
             self.message = '\n'.join([self.message, msg])
-            out = log(msg=f'\n\n{"*"*10} Warning {"*"*10}\n{self.message}\n',traceback=traceback,cf=currentframe(),verbose=verbose)
+        if not hold:
+            out = log(msg=f'{"*"*10} Warning {"*"*10}\n{self.message}\n',traceback=traceback,cf=currentframe(),verbose=verbose)
             self.message = ''
             self.updateLog(out)
-        return(out)
+
 
     def logChoice(self,msg,proceed='Y',verbose=None):
         if verbose is None:
@@ -231,16 +230,18 @@ class baseClass:
         else:
             log(msg='Exiting',kill=True)
         self.updateLog(out)
-        return(out)
+
 
     def logMessage(self,msg,verbose=None,traceback=False):
         if verbose is None:
             verbose = self.verbose
-        out = log(f"\n{msg}\n",traceback=traceback,verbose=verbose,cf=currentframe())
+        out = log(f"{msg}\n",traceback=traceback,verbose=verbose,cf=currentframe())
         self.updateLog(out)
-        return(out)
+
 
     def updateLog(self,out):
+        if out.startswith('Log file: '):
+            out = out.split('\n',1)[-1]
         self.logFile=self.logFile+'\n'+out
 
 

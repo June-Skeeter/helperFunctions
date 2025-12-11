@@ -21,23 +21,24 @@ ymlStartMarker = '\n---\n'
 #   * True - include all values
 #   * False - exclude values if they are None
 
-def dcToDict(dc,repr=True,inheritance=True,keepNull=True):
+def dcToDict(dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1):
     fields = dc.__dataclass_fields__
     # Keys of child class
     if inheritance:
         # Keys of child and all parent classes with inverse order of MRO (children last)
-        outputKeys = [n for m in type(dc).__mro__[::-1] if hasattr(m,'__annotations__') for n in list(m.__annotations__)]        
+        outputKeys = [n for m in type(dc).__mro__[::majorOrder] if hasattr(m,'__annotations__') for n in list(m.__annotations__)[::minorOrder]]        
     else:
         # Only child keys
         outputKeys = list(dc.__annotations__)
     
-    outputValues = [getattr(dc, k) for k in outputKeys
-                    if hasattr(dc, k)]
+    # If wanting to add functionality later, its here.  Could override keepNull=True
+    # optional = {k:False if 'optional' not in dc.__dataclass_fields__[k].metadata else dc.__dataclass_fields__[k].metadata['optional'] for k in outputKeys}
+    optional = {k:True for k in outputKeys}
 
     cleanOutput = {
         k: getattr(dc, k) for k in outputKeys
         if hasattr(dc, k) and
-        (keepNull or getattr(dc, k) is not None) and # Apply null filter if applicable
+        (keepNull or not optional[k] or getattr(dc, k) is not None) and # Apply null filter if applicable
         (fields[k].repr or not repr) # Apply repr filter if applicable
     }
     # Move iterables to back to increase readability of yaml files
@@ -52,28 +53,6 @@ def dcToDict(dc,repr=True,inheritance=True,keepNull=True):
     return finalOutput
 
 
-
-
-    # if repr:
-    #     return({
-    #         k:dc.__dict__[k] for k in outputKeys
-    #         if k in dc.__dataclass_fields__ and 
-    #         dc.__dataclass_fields__[k].repr and
-    #         (keepNull or dc.__dict__[k] is not None)
-    #         })
-    # elif repr is None:
-    #     return({
-    #         k:dc.__dict__[k] for k in outputKeys
-    #         if k in dc.__dataclass_fields__ and
-    #         (keepNull or dc.__dict__[k] is not None)
-    #         })
-    # else:
-    #     return({
-    #         k:dc.__dict__[k] for k in outputKeys
-    #         if k in dc.__dataclass_fields__ and
-    #         not dc.__dataclass_fields__[k].repr and
-    #         (keepNull or dc.__dict__[k] is not None)
-    #         })
 
 # Load a dictionary a .json or .yml file
 # Preserve the header in a yaml file if desired
@@ -120,7 +99,9 @@ def saveDict(obj,fileName,header=None,sort_keys=False,indent=None,anchors=False)
         os.makedirs(os.path.split(fileName)[0])
 
     with open(fileName,'w') as file:
+        # breakpoint()
         if fileName.endswith('.yml'):
+            # print(fileName)
             if header:
                 header = '\n'.join([h if h.startswith('#') else '# '+h for h in header.split('\n')])
                 file.write(header+ymlStartMarker)
