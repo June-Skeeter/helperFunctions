@@ -1,7 +1,9 @@
 
 import os
+import sys
 from . import updateDict
-# Stashing here incase needed for later.  
+
+# Stashing here in case needed for later.  
 def unpackDict(Tree,format=os.path.sep,limit=None):
     # recursive function to condense a nested dict by concatenating keys to a string
     def unpack(child,parent=None,root=None,format=None,limit=None):
@@ -15,6 +17,7 @@ def unpackDict(Tree,format=os.path.sep,limit=None):
                 else:
                     key = format.join([parent,key])
                 if type(value) is not dict or (limit is not None and limit < 0) or not value:
+                    print(key,value)
                     pth[key] = unpack(value,key,root,format,limit)
                 else:
                     pth = pth | unpack(value,key,root,format,limit)

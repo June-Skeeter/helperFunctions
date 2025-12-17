@@ -31,7 +31,7 @@ class baseClass:
     configFileExtension: str = field(default='.yml',repr=False)
     configFileExists: bool = field(default=True,repr=False)
 
-    safeMode: bool = field(default=True,repr=False) # Only write config if safemode == False or configFileExists=False
+    readOnly: bool = field(default=True,repr=False) # Only write config if readOnly == False or configFileExists=False
 
     # defaultMD: dict = field(default_factory=lambda:{'optional':True},init=False,repr=False)
     
@@ -64,7 +64,7 @@ class baseClass:
 
         
     def close(self):
-        if not self.safeMode or not self.configFileExists:
+        if not self.readOnly or not self.configFileExists:
             self.saveConfigFile()
         return (self.logFile)
         
@@ -151,8 +151,8 @@ class baseClass:
                         (self.__dataclass_fields__[key].default_factory is not MISSING and self.__dataclass_fields__[key].default_factory() == self.__dict__[key])):
                         setattr(self,key,value)
                     else:
-                        if self.safeMode:
-                            self.logWarning('Cannot over-write yaml configurations with field inputs when running with safeMode = True')
+                        if self.readOnly:
+                            self.logWarning('Cannot over-write yaml configurations with field inputs when running with readOnly = True')
                         else:
                             self.logWarning(f'typeChecking issue when reading from yaml')
                             self.logChoice('Proceed with interactive debug session')
