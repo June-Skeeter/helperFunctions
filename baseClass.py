@@ -25,44 +25,35 @@ class baseClass:
     logFile: str = field(default=f"Log file: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}\n",repr=False)
     keepNull: bool = field(default=True,repr=False)
 
-    configFilePath: str = field(default=None,repr=False) # If valid yaml file path is provided, the dataclass will read from the file
-    configFileRoot: str = field(default=None,repr=False) # If valid yaml file path is provided, the dataclass will read from the file
-    configFileName: str = field(default=None,repr=False) # If valid yaml file path is provided, the dataclass will read from the file
-    configFileExtension: str = field(default='.yml',repr=False)
-    configFileExists: bool = field(default=True,repr=False)
+    
+    rootPath: str = field(default=None,repr=False) # Optional basepath to yaml config (for saving/reading)
+    configName: str = field(default=None,repr=False) # Optional filename for yaml config
+
+    configFileExists: bool = field(init=False,repr=False)
 
     readOnly: bool = field(default=True,repr=False) # Only write config if readOnly == False or configFileExists=False
 
-    # defaultMD: dict = field(default_factory=lambda:{'optional':True},init=False,repr=False)
+    lastModified: str = field(default=None,repr=False)
     
     _inheritedMetadata: bool = field(default=True,repr=False)
 
-    @classmethod
-    def from_dict(cls, env):  
-        # Source - https://stackoverflow.com/a/55096964
-        # Posted by Arne, modified by community. See post 'Timeline' for change history
-        # Retrieved 2025-11-21, License - CC BY-SA 4.0    
-        return cls(**{
-            k: v for k, v in env.items() 
-            if k in inspect.signature(cls).parameters
-        })
 
     def __post_init__(self):
         if type(self).__name__ != 'baseClass':
+            self.pathResolution()
             self.logMessage(f"Running: {type(self)}")
-            if self.configFilePath is None and (
-                self.configFileRoot is not None and self.configFileName is not None):
-                if '.' not in self.configFileName:
-                    self.configFileName = self.configFileName+self.configFileExtension
-                self.configFilePath = os.path.join(self.configFileRoot,self.configFileName)
-            if self.configFilePath:
-                self.loadFromConfigFile()
-            else:
-                self.configFileExists = False
             if self.typeCheck:
                 self.inspectFields()
 
-        
+    def pathResolution(self):
+        if not self.rootPath:
+            self.configFileExists = False
+            return
+        if not self.configName:
+            self.configName = type(self).__name__+'.yml'
+        self.configFilePath = os.path.join(self.rootPath,self.configName)
+        self.loadFromConfigFile()
+
     def close(self):
         if not self.readOnly or not self.configFileExists:
             self.saveConfigFile()
@@ -133,8 +124,6 @@ class baseClass:
         defaultOverwrites = [
             'dateModified'
         ]
-        if self.configFileRoot is None and self.configFileName is None:
-            self.configFileRoot, self.configFileName = os.path.split(self.configFilePath)
         if os.path.exists(self.configFilePath):
             self.logMessage(f"Reading: {self.configFilePath}")
             tmp,self.header = loadDict(fileName=self.configFilePath,returnHeader=True)
@@ -167,6 +156,7 @@ class baseClass:
         return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder))
 
     def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,verbose=None,majorOrder=1,minorOrder=1):
+        self.lastModified = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         if verbose is None:
             verbose = self.verbose
         configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder)
@@ -184,20 +174,20 @@ class baseClass:
                 header=header
             )
 
-    def syncAttributes(self,incoming,inheritance=False,overwrite=False):
-        excl = baseClass.__dataclass_fields__.keys()
-        # Add attributes of one class to another and avoid circular imports
-        self.logWarning(msg=f'Syncing {type(incoming).__name__} into {type(self).__name__}',traceback=True)
-        if inheritance:
-            keys = [k for k in list(incoming.__dict__.keys())
-                    if k not in excl]
-        else:
-            keys = list(incoming.__annotations__.keys())
-        for key in keys:
-            if not hasattr(self,key):
-                setattr(self,key,incoming.__dict__[key])
-            elif overwrite and self.__dict__[key] != incoming.__dict__[key]:
-                setattr(self,key,incoming.__dict__[key])
+    # def syncAttributes(self,incoming,inheritance=False,overwrite=False):
+    #     excl = baseClass.__dataclass_fields__.keys()
+    #     # Add attributes of one class to another and avoid circular imports
+    #     self.logWarning(msg=f'Syncing {type(incoming).__name__} into {type(self).__name__}',traceback=True)
+    #     if inheritance:
+    #         keys = [k for k in list(incoming.__dict__.keys())
+    #                 if k not in excl]
+    #     else:
+    #         keys = list(incoming.__annotations__.keys())
+    #     for key in keys:
+    #         if not hasattr(self,key):
+    #             setattr(self,key,incoming.__dict__[key])
+    #         elif overwrite and self.__dict__[key] != incoming.__dict__[key]:
+    #             setattr(self,key,incoming.__dict__[key])
                
 
     def logError(self,msg='',traceback=True,kill=True,verbose=None):
@@ -235,6 +225,8 @@ class baseClass:
     def logMessage(self,msg,verbose=None,traceback=False):
         if verbose is None:
             verbose = self.verbose
+        # if not verbose:
+        #     breakpoint()
         out = log(f"{msg}\n",traceback=traceback,verbose=verbose,cf=currentframe())
         self.updateLog(out)
 
@@ -245,15 +237,28 @@ class baseClass:
         self.logFile=self.logFile+'\n'+out
 
 
+
+    @classmethod
+    def from_dict(cls, env):  
+        # Source - https://stackoverflow.com/a/55096964
+        # Posted by Arne, modified by community. See post 'Timeline' for change history
+        # Retrieved 2025-11-21, License - CC BY-SA 4.0    
+        return cls(**{
+            k: v for k, v in env.items() 
+            if k in inspect.signature(cls).parameters
+        })
+    
     @classmethod
     def template(cls):
         template = {}
+        hidden = {'typeCheck':False}
         for k,v in cls.__dataclass_fields__.items():
             if v.repr:
-                desc = {'datatype':v.type.__name__,}
-                if 'description' in v.metadata:
-                    desc['description'] = v.metadata['description']
-                if 'options' in v.metadata:
-                    desc['options'] = v.metadata['options']
+                desc = f'# datatype={v.type.__name__}; '
+                for key,value in v.metadata.items():
+                    desc = desc + f"{key}={v.metadata[key]}; "
                 template[k] = desc
+            else:            
+                hidden[k] = ''
+        template = cls.from_dict(template|hidden).to_dict()
         return(template)
