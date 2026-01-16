@@ -41,6 +41,8 @@ class baseClass:
     def __post_init__(self):
         if type(self).__name__ != 'baseClass':
             self.pathResolution()
+            if self.verbose:
+                breakpoint()
             self.logMessage(f"Running: {type(self)}")
             if self.typeCheck:
                 self.inspectFields()
