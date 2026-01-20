@@ -18,13 +18,14 @@ from .log import log
 @dataclass
 class baseClass:
     UID: str = field(default=None,repr=False)
-    verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
+    verbose: bool = field(default=False,repr=False) # Enable verbose output for type coercion warnings
 
     typeCheck: bool = field(default=True,repr=False)
     message: str = field(default='',repr=False)
     logFile: str = field(default=f"Log file: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}\n",repr=False)
     keepNull: bool = field(default=True,repr=False)
 
+    debug: bool = field(default=False,repr=False)
     
     rootPath: str = field(default=None,repr=False) # Optional basepath to yaml config (for saving/reading)
     configName: str = field(default=None,repr=False) # Optional filename for yaml config
@@ -41,8 +42,6 @@ class baseClass:
     def __post_init__(self):
         if type(self).__name__ != 'baseClass':
             self.pathResolution()
-            if self.verbose:
-                breakpoint()
             self.logMessage(f"Running: {type(self)}")
             if self.typeCheck:
                 self.inspectFields()
@@ -145,9 +144,13 @@ class baseClass:
                         if self.readOnly:
                             self.logWarning('Cannot over-write yaml configurations with field inputs when running with readOnly = True')
                         else:
-                            self.logWarning(f'typeChecking issue when reading from yaml')
-                            self.logChoice('Proceed with interactive debug session')
-                            breakpoint()
+                            self.logWarning(f'Overwriting value in {key}',verbose=True)
+                            # breakpoint()
+                            self.debug=True
+                            # self.__dict__[key] = value
+                            # self.logWarning(f'typeChecking issue when reading {key} from yaml',verbose=True)
+                            # self.logChoice('Proceed with interactive debug session')
+                            # breakpoint()
             self.configFileExists = True
         else:
             self.configFileExists = False
@@ -213,9 +216,9 @@ class baseClass:
 
 
     def logChoice(self,msg,proceed='Y',verbose=None):
-        if verbose is None:
-            verbose = self.verbose
-        out = log(msg=msg,cf=currentframe(),verbose=verbose)
+        # if verbose is None:
+        #     verbose = self.verbose
+        out = log(msg=msg,cf=currentframe(),verbose=True)
         i = input(f'Enter {proceed} to continue or any other key to exit: ')
         if i == proceed:
             return
@@ -237,6 +240,10 @@ class baseClass:
         if out.startswith('Log file: '):
             out = out.split('\n',1)[-1]
         self.logFile=self.logFile+'\n'+out
+
+    @classmethod
+    def from_class(cls,env,kwargs):
+        return(cls(**{k:getattr(env,k) for k,v in cls.__dataclass_fields__.items() if hasattr(env,k) and v.init}|kwargs))
 
 
 
