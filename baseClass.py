@@ -7,7 +7,7 @@ from typing import Iterable
 # from .parseCoordinates import parseCoordinates
 from .dictFuncs import dcToDict,loadDict,saveDict
 from datetime import datetime, timezone
-import dateparser
+# import dateparser
 from inspect import currentframe
 from .log import log
 
@@ -71,16 +71,20 @@ class baseClass:
         if not isinstance(value, field_type) and value is not None:
             current_type = type(value)
             self.logWarning(f"\nType mismatch for field: `{name}`\nExpected input of {field_type.__name__}, received input of {current_type.__name__}\nAttempting to coerce value: {value}",hold=True)
-            if field_type == datetime:
-                # self.logWarning('Auto parsing date, will assume format: YMD order and UTC time (unless specified)')
-                TIMESTAMP = dateparser.parse(value,settings={'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':True})
-                setattr(self, name, TIMESTAMP)
-                self.logWarning(f'Confirm variable coerced correctly: {value}')
-            elif dataclasses.is_dataclass(value) and hasattr(value,'to_dict'):
+            # if field_type == datetime:
+            #     # self.logWarning('Auto parsing date, will assume format: YMD order and UTC time (unless specified)')
+            #     TIMESTAMP = dateparser.parse(value,settings={'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':True})
+            #     setattr(self, name, TIMESTAMP)
+            #     self.logWarning(f'Confirm variable coerced correctly: {value}')
+            # el
+            if dataclasses.is_dataclass(value) and hasattr(value,'to_dict'):
                 setattr(self,name,value.to_dict())               
             elif hasattr(field_type, '__module__') and field_type.__module__ == 'builtins':
                 try:
-                    setattr(self, name,  field_type(value))
+                    if type(value) is str and field_type is list:
+                        setattr(self,name,[value])
+                    else:
+                        setattr(self, name,  field_type(value))
                     if not current_type is int and not field_type is float:
                         self.logWarning(f'Confirm variable coerced correctly: {value}')
                 except:
