@@ -56,7 +56,7 @@ def dcToDict(dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder
 
 # Load a dictionary a .json or .yml file
 # Preserve the header in a yaml file if desired
-def loadDict(fileName,template = {},returnHeader=False,verbose=False,traceback=False):
+def loadDict(fileName=None,template = {},returnHeader=False,verbose=False,traceback=False):
     fileName = os.path.abspath(fileName)
     if os.path.isfile(fileName):
         if fileName.endswith('.yml') or fileName.endswith('.yaml'):
@@ -76,15 +76,7 @@ def loadDict(fileName,template = {},returnHeader=False,verbose=False,traceback=F
         else:
             log(f'File format not supported for {fileName}',kill=True)
     else:
-        
         log(f'Does not exist:\n {fileName}',kill=True)
-        # try:
-        #     log(f"Does not exist:\n{fileName}\nCreating new file using default or user-provided template:\n{template}",traceback=traceback,verbose=verbose)
-        # except:
-        #     log(f"Does not exist:\n{fileName}\nCreating new file using default or user-provided template:\n",traceback=traceback,verbose=verbose)
-        #     pass
-        # out = copy.deepcopy(template)
-        # saveDict(out,fileName)
     if returnHeader:
         return(out,header)
     else:

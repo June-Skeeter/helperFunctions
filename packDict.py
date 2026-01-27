@@ -28,7 +28,7 @@ def unpackDict(Tree,format=os.path.sep,limit=None):
         return(pth)
     return(unpack(Tree,format=format,limit=limit))
 
-def packDict(itemList,format=os.path.sep,limit=None,order=-1,fill=None,verbose=False):
+def packDict(itemList,format=os.path.sep,limit=None,order=-1,base=None,fill=None,verbose=False):
     # recursive function to generate nested dict from list of strings, splitting by sep
     Tree = {}
     if type(itemList) is list:
@@ -41,7 +41,10 @@ def packDict(itemList,format=os.path.sep,limit=None,order=-1,fill=None,verbose=F
     elif type(itemList) is not dict:
         itemList = {itemList:fill}
     for key,value in itemList.items():
-        b = key.split(format)
+        if base is None:
+            b = key.split(format)
+        else:
+            b = [base] + [b for b in key.replace(base,'').split(format) if b != '']
         if order == -1:
             if limit is None: lm = len(b)+order
             else: lm = limit

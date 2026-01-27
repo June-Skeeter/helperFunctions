@@ -3,18 +3,20 @@ import inspect
 import dataclasses
 from types import MappingProxyType
 from dataclasses import dataclass, field, MISSING
-from typing import Iterable
+from typing import Iterable, Callable
 # from .parseCoordinates import parseCoordinates
-from .dictFuncs import dcToDict,loadDict,saveDict
+from .dictFuncs import dcToDict,saveDict,loadDict
 from datetime import datetime, timezone
 # import dateparser
 from inspect import currentframe
 from .log import log
 
+# def f:
+#     return(loadDict)
+
 # baseClass is a parent dataclass which gives enhanced functionality to dataclasses
 # * Supports type checking
 # * Reading and writing from yaml files (with type checking)
-
 @dataclass
 class baseClass:
     UID: str = field(default=None,repr=False)
@@ -23,14 +25,14 @@ class baseClass:
     typeCheck: bool = field(default=True,repr=False)
     message: str = field(default='',repr=False)
     logFile: str = field(default=f"Log file: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}\n",repr=False)
-    keepNull: bool = field(default=True,repr=False)
+    # keepNull: bool = field(default=True,repr=False)
 
     debug: bool = field(default=False,repr=False)
     
-    rootPath: str = field(default=None,repr=False) # Optional basepath to yaml config (for saving/reading)
-    configName: str = field(default=None,repr=False) # Optional filename for yaml config
+    fromFile: bool = field(default=False,repr=False) # set to true to load from config file (if exists)
 
-    configFileExists: bool = field(init=False,repr=False)
+    configFileExists: bool = field(default=False,repr=False)
+    configFilePath: str = field(default=None,repr=False)
 
     readOnly: bool = field(default=True,repr=False) # Only write config if readOnly == False or configFileExists=False
 
@@ -38,22 +40,17 @@ class baseClass:
     
     _inheritedMetadata: bool = field(default=True,repr=False)
 
+    loadDict: Callable = field(default_factory=lambda: loadDict, repr=False)
+    saveDict: Callable = field(default_factory=lambda: saveDict, repr=False)
 
     def __post_init__(self):
         if type(self).__name__ != 'baseClass':
-            self.pathResolution()
+            if self.fromFile and os.path.exists(self.configFilePath):
+                self.loadFromConfigFile()
+                self.configFileExists = True
             self.logMessage(f"Running: {type(self)}")
             if self.typeCheck:
                 self.inspectFields()
-
-    def pathResolution(self):
-        if not self.rootPath:
-            self.configFileExists = False
-            return
-        if not self.configName:
-            self.configName = type(self).__name__+'.yml'
-        self.configFilePath = os.path.join(self.rootPath,self.configName)
-        self.loadFromConfigFile()
 
     def close(self):
         if not self.readOnly or not self.configFileExists:
@@ -71,12 +68,6 @@ class baseClass:
         if not isinstance(value, field_type) and value is not None:
             current_type = type(value)
             self.logWarning(f"\nType mismatch for field: `{name}`\nExpected input of {field_type.__name__}, received input of {current_type.__name__}\nAttempting to coerce value: {value}",hold=True)
-            # if field_type == datetime:
-            #     # self.logWarning('Auto parsing date, will assume format: YMD order and UTC time (unless specified)')
-            #     TIMESTAMP = dateparser.parse(value,settings={'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':True})
-            #     setattr(self, name, TIMESTAMP)
-            #     self.logWarning(f'Confirm variable coerced correctly: {value}')
-            # el
             if dataclasses.is_dataclass(value) and hasattr(value,'to_dict'):
                 setattr(self,name,value.to_dict())               
             elif hasattr(field_type, '__module__') and field_type.__module__ == 'builtins':
@@ -114,7 +105,8 @@ class baseClass:
                 if value in field.metadata['options']:
                     pass
                 elif field.type is str and value not in field.metadata['options'] and value is not None:
-                    self.logWarning(f"{value} is not valid")
+                    self.logWarning(msg=f"{value} is not valid")
+                    breakpoint()
                     self.logError(msg=f'{name} must be one of {field.metadata["options"]}')
 
                 elif value is not None:
@@ -129,39 +121,27 @@ class baseClass:
         defaultOverwrites = [
             'dateModified'
         ]
-        if os.path.exists(self.configFilePath):
-            self.logMessage(f"Reading: {self.configFilePath}")
-            tmp,self.header = loadDict(fileName=self.configFilePath,returnHeader=True)
-            for key,value in tmp.items():
-                # Overwrite defaults
-                if key not in self.__dataclass_fields__.keys():
-                    self.logError(f'Does not accept generic undefined parameters, field {key} must be added to source code')
-                elif key in defaultOverwrites:
+        self.logMessage(f"Reading: {self.configFilePath}")
+        tmp,self.header = self.loadDict(fileName=self.configFilePath,returnHeader=True)
+        for key,value in tmp.items():
+            # Overwrite defaults
+            if key not in self.__dataclass_fields__.keys():
+                self.logError(f'Does not accept generic undefined parameters,\n {key} field must be added to source code')
+            elif key in defaultOverwrites:
+                setattr(self,key,value)
+            elif key not in self.__dict__.keys():
+                setattr(self,key,value)
+            elif value != self.__dict__[key]:
+                if (self.__dataclass_fields__[key].default == self.__dict__[key] or 
+                    (self.__dataclass_fields__[key].default_factory is not MISSING and self.__dataclass_fields__[key].default_factory() == self.__dict__[key])):
                     setattr(self,key,value)
-                elif key not in self.__dict__.keys():
-                    setattr(self,key,value)
-                elif value != self.__dict__[key]:
-                    if (self.__dataclass_fields__[key].default == self.__dict__[key] or 
-                        (self.__dataclass_fields__[key].default_factory is not MISSING and self.__dataclass_fields__[key].default_factory() == self.__dict__[key])):
-                        setattr(self,key,value)
+                else:
+                    if self.readOnly:
+                        self.logWarning('Cannot over-write yaml configurations with field inputs when running with readOnly = True')
                     else:
-                        if self.readOnly:
-                            self.logWarning('Cannot over-write yaml configurations with field inputs when running with readOnly = True')
-                        else:
-                            self.logWarning(f'Overwriting value in {key}',verbose=True)
-                            # breakpoint()
-                            self.debug=True
-                            # self.__dict__[key] = value
-                            # self.logWarning(f'typeChecking issue when reading {key} from yaml',verbose=True)
-                            # self.logChoice('Proceed with interactive debug session')
-                            # breakpoint()
-            self.configFileExists = True
-        else:
-            self.configFileExists = False
+                        self.logWarning(f'Overwriting value in {key}',verbose=True)
         
-    def to_dict(self,repr=True,inheritance=True,keepNull=None,majorOrder=1,minorOrder=1):
-        if keepNull is None:
-            keepNull = self.keepNull
+    def to_dict(self,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1):
         return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder))
 
     def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,verbose=None,majorOrder=1,minorOrder=1):
@@ -173,38 +153,21 @@ class baseClass:
             self.logMessage('No filepath provided, only returning config dictionary')
         else:
             self.logMessage(f"Saving: {self.configFilePath}")
-            if hasattr(self,'header'):
+            if hasattr(self,'header') and self.header is not None:
                 header=self.header
             else:
                 header=None
-            saveDict(
+            self.saveDict(
                 configDict,
                 fileName=self.configFilePath,
                 header=header
             )
-
-    # def syncAttributes(self,incoming,inheritance=False,overwrite=False):
-    #     excl = baseClass.__dataclass_fields__.keys()
-    #     # Add attributes of one class to another and avoid circular imports
-    #     self.logWarning(msg=f'Syncing {type(incoming).__name__} into {type(self).__name__}',traceback=True)
-    #     if inheritance:
-    #         keys = [k for k in list(incoming.__dict__.keys())
-    #                 if k not in excl]
-    #     else:
-    #         keys = list(incoming.__annotations__.keys())
-    #     for key in keys:
-    #         if not hasattr(self,key):
-    #             setattr(self,key,incoming.__dict__[key])
-    #         elif overwrite and self.__dict__[key] != incoming.__dict__[key]:
-    #             setattr(self,key,incoming.__dict__[key])
-               
-
+            
     def logError(self,msg='',traceback=True,kill=True,verbose=None):
         if verbose is None:
             verbose = self.verbose
         out = log(msg=f'\n\n{"*"*11} Error {"*"*11}\n{msg}\n{"*"*10} Exiting {"*"*10}\n',traceback=traceback,kill=kill,cf=currentframe(),verbose=verbose)
         self.updateLog(out)
-
 
     def logWarning(self,msg='',hold=False,traceback=False,verbose=None):
         if verbose is None:
