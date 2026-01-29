@@ -44,6 +44,8 @@ class baseClass:
     saveDict: Callable = field(default_factory=lambda: saveDict, repr=False)
 
     def __post_init__(self):
+        if self.debug:
+            breakpoint()
         if type(self).__name__ != 'baseClass':
             if self.fromFile and os.path.exists(self.configFilePath):
                 self.loadFromConfigFile()
@@ -139,13 +141,13 @@ class baseClass:
                     if self.readOnly:
                         self.logWarning('Cannot over-write yaml configurations with field inputs when running with readOnly = True')
                     else:
-                        self.logWarning(f'Overwriting value in {key}',verbose=True)
+                        self.logWarning(f'Overwriting value in {key}')
         
     def to_dict(self,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1):
         return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder))
 
     def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,verbose=None,majorOrder=1,minorOrder=1):
-        self.lastModified = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        self.lastModified = self.modTime()
         if verbose is None:
             verbose = self.verbose
         configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder)
@@ -207,6 +209,9 @@ class baseClass:
         if out.startswith('Log file: '):
             out = out.split('\n',1)[-1]
         self.logFile=self.logFile+'\n'+out
+
+    def modTime(self):
+        return(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
 
     @classmethod
     def from_class(cls,env,kwargs):
