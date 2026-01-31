@@ -31,6 +31,7 @@ class baseClass:
     
     fromFile: bool = field(default=False,repr=False) # set to true to load from config file (if exists)
 
+    configReset: bool = field(default=False,repr=False)
     configFileExists: bool = field(default=False,repr=False)
     configFilePath: str = field(default=None,repr=False)
 
@@ -44,10 +45,8 @@ class baseClass:
     saveDict: Callable = field(default_factory=lambda: saveDict, repr=False)
 
     def __post_init__(self):
-        if self.debug:
-            breakpoint()
         if type(self).__name__ != 'baseClass':
-            if self.fromFile and os.path.exists(self.configFilePath):
+            if self.fromFile and os.path.exists(self.configFilePath) and not self.configReset:
                 self.loadFromConfigFile()
                 self.configFileExists = True
             self.logMessage(f"Running: {type(self)}")
@@ -142,6 +141,9 @@ class baseClass:
                         self.logWarning('Cannot over-write yaml configurations with field inputs when running with readOnly = True')
                     else:
                         self.logWarning(f'Overwriting value in {key}')
+        if self.debug and 'traceMetadata' in self.__dict__.keys():
+            print(self.__dict__['traceMetadata'])
+            breakpoint()
         
     def to_dict(self,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1):
         return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder))
