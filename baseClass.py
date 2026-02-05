@@ -11,8 +11,6 @@ from datetime import datetime, timezone
 from inspect import currentframe
 from .log import log
 
-# def f:
-#     return(loadDict)
 
 # baseClass is a parent dataclass which gives enhanced functionality to dataclasses
 # * Supports type checking
@@ -25,7 +23,6 @@ class baseClass:
     typeCheck: bool = field(default=True,repr=False)
     message: str = field(default='',repr=False)
     logFile: str = field(default=f"Log file: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}\n",repr=False)
-    # keepNull: bool = field(default=True,repr=False)
 
     debug: bool = field(default=False,repr=False)
     
@@ -37,26 +34,26 @@ class baseClass:
 
     readOnly: bool = field(default=True,repr=False) # Only write config if readOnly == False or configFileExists=False
 
-    lastModified: str = field(default=None,repr=False)
     
-    _inheritedMetadata: bool = field(default=True,repr=False)
+    # _inheritedMetadata: bool = field(default=True,repr=False,metadata={'description':'Date the configuration file was last modified.  Auto-generated, does not account for manual modifications by user.'})
 
-    loadDict: Callable = field(default_factory=lambda: loadDict, repr=False)
-    saveDict: Callable = field(default_factory=lambda: saveDict, repr=False)
+    loadDict: Callable = field(default_factory=lambda: loadDict, repr=False, init=False)
+    saveDict: Callable = field(default_factory=lambda: saveDict, repr=False, init=False)
 
     def __post_init__(self):
         if type(self).__name__ != 'baseClass':
             if self.fromFile and os.path.exists(self.configFilePath) and not self.configReset:
                 self.loadFromConfigFile()
                 self.configFileExists = True
-            self.logMessage(f"Running: {type(self)}")
+            if self.debug:
+                self.logMessage(f"Running: {type(self)}")
             if self.typeCheck:
                 self.inspectFields()
 
-    def close(self):
-        if not self.readOnly or not self.configFileExists:
-            self.saveConfigFile()
-        return (self.logFile)
+    # def close(self):
+    #     if not self.readOnly or not self.configFileExists:
+    #         self.saveConfigFile()
+    #     return (self.logFile)
         
     def inspectFields(self):
         for (name, field) in self.__dataclass_fields__.items():
@@ -88,19 +85,19 @@ class baseClass:
                 self.logError(f'Coercion failed for {name} \nCannot coerce custom type: {field_type}')
     
     def checkMetadata(self,name,value,field):
-        if self._inheritedMetadata:
-            # Ensure metadata are not overwritten 
-            if not field.metadata:
-                middleClasses = [mc for mc in type(self).__mro__[1:-2]]
-                for mc in middleClasses:
-                    if name in mc.__annotations__.keys():
-                        self.__dataclass_fields__[name].metadata = mc.__dataclass_fields__[name].metadata
-            elif hasattr(self,'defaultMD'):
-                md = dict(field.metadata)
-                for k,v in self.defaultMD.items():
-                    if k not in md.keys():
-                        md[k] = v
-                self.__dataclass_fields__[name].metadata = MappingProxyType(md)
+        # if self._inheritedMetadata:
+        #     # Ensure metadata are not overwritten 
+        #     if not field.metadata:
+        #         middleClasses = [mc for mc in type(self).__mro__[1:-2]]
+        #         for mc in middleClasses:
+        #             if name in mc.__annotations__.keys():
+        #                 self.__dataclass_fields__[name].metadata = mc.__dataclass_fields__[name].metadata
+        #     elif hasattr(self,'defaultMD'):
+        #         md = dict(field.metadata)
+        #         for k,v in self.defaultMD.items():
+        #             if k not in md.keys():
+        #                 md[k] = v
+        #         self.__dataclass_fields__[name].metadata = MappingProxyType(md)
         if 'options' in field.metadata:
             if isinstance(field.metadata['options'],Iterable):
                 if value in field.metadata['options']:
@@ -141,9 +138,7 @@ class baseClass:
                         self.logWarning('Cannot over-write yaml configurations with field inputs when running with readOnly = True')
                     else:
                         self.logWarning(f'Overwriting value in {key}')
-        if self.debug and 'traceMetadata' in self.__dict__.keys():
-            print(self.__dict__['traceMetadata'])
-            breakpoint()
+
         
     def to_dict(self,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1):
         return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder))
@@ -161,11 +156,12 @@ class baseClass:
                 header=self.header
             else:
                 header=None
+            breakpoint()
             self.saveDict(
                 configDict,
                 fileName=self.configFilePath,
                 header=header
-            )
+                )
             
     def logError(self,msg='',traceback=True,kill=True,verbose=None):
         if verbose is None:
@@ -212,14 +208,12 @@ class baseClass:
             out = out.split('\n',1)[-1]
         self.logFile=self.logFile+'\n'+out
 
-    def modTime(self):
-        return(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+    def currentTimeString(self=None,fmt='%Y-%m-%dT%H:%M:%SZ'):
+        return(datetime.now(timezone.utc).strftime(fmt))
 
     @classmethod
     def from_class(cls,env,kwargs):
         return(cls(**{k:getattr(env,k) for k,v in cls.__dataclass_fields__.items() if hasattr(env,k) and v.init}|kwargs))
-
-
 
     @classmethod
     def from_dict(cls, env):  
@@ -231,17 +225,13 @@ class baseClass:
             if k in inspect.signature(cls).parameters
         })
     
+    
+    
     @classmethod
-    def template(cls):
-        template = {}
-        hidden = {'typeCheck':False}
-        for k,v in cls.__dataclass_fields__.items():
-            if v.repr:
-                desc = f'# datatype={v.type.__name__}; '
-                for key,value in v.metadata.items():
-                    desc = desc + f"{key}={v.metadata[key]}; "
-                template[k] = desc
-            else:            
-                hidden[k] = ''
-        template = cls.from_dict(template|hidden).to_dict()
-        return(template)
+    def metadataMap(cls,description,options=None):
+        # Streamline the creation of metadata in dataclass fields by formatting a standardized dict
+        out = {'description':description}
+        if options is not None:
+            out['options'] = options
+        return(out)
+    

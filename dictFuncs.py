@@ -1,12 +1,19 @@
 # A small set of functions for handlign common tasks with dictionary objects
 import os
 import sys
-import yaml
+# import yaml
 import json
 from typing import Iterable
 from .log import log
 import copy
 ymlStartMarker = '\n---\n'
+
+
+from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap
+
+yaml = YAML()
+
 
 # Convert a dataclass to a dictionary
 # Can give similar output as built in __dict__ if run with (repr=False) but modified order (child fields before parent fields)
@@ -22,6 +29,7 @@ ymlStartMarker = '\n---\n'
 # 3. keepNull
 #   * True - include all values
 #   * False - exclude values if they are None
+
 
 def dcToDict(dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1):
     fields = dc.__dataclass_fields__
@@ -70,7 +78,7 @@ def loadDict(fileName=None,template = {},returnHeader=False,verbose=False,traceb
                 else:
                     header = None
             with open(fileName) as file:
-                out = yaml.safe_load(file)
+                out = yaml.load(file)
         elif fileName.endswith('.json'):
             with open(fileName) as file:
                 out = json.load(file)
@@ -100,9 +108,13 @@ def saveDict(obj,fileName,header=None,sort_keys=False,indent=None,anchors=False)
                 header = '\n'.join([h if h.startswith('#') else '# '+h for h in header.split('\n')])
                 file.write(header+ymlStartMarker)
             if anchors:
-                yaml.safe_dump(obj,file,sort_keys=sort_keys,default_flow_style=False)
+                yaml.dump(obj,file)
             else:
-                yaml.safe_dump(obj,file,sort_keys=sort_keys)
+                yaml.dump(obj,file)
+            # if anchors:
+            #     yaml.safe_dump(obj,file,sort_keys=sort_keys,default_flow_style=False)
+            # else:
+            #     yaml.safe_dump(obj,file,sort_keys=sort_keys)
         if fileName.endswith('.json'):
             json.dump(obj,file,indent=indent)
 
