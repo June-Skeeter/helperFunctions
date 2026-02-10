@@ -2,14 +2,20 @@ import os
 import inspect
 import dataclasses
 from types import MappingProxyType
-from dataclasses import dataclass, field, MISSING
+from dataclasses import dataclass, field, MISSING, make_dataclass
 from typing import Iterable, Callable
 # from .parseCoordinates import parseCoordinates
 from .dictFuncs import dcToDict,saveDict,loadDict
+# from helperFunctions.dictFuncs import dcToDict,saveDict,loadDict
 from datetime import datetime, timezone
 # import dateparser
 from inspect import currentframe
 from .log import log
+
+# from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap
+
+# ruamel = YAML()
 
 
 # baseClass is a parent dataclass which gives enhanced functionality to dataclasses
@@ -225,8 +231,6 @@ class baseClass:
             if k in inspect.signature(cls).parameters
         })
     
-    
-    
     @classmethod
     def metadataMap(cls,description,options=None):
         # Streamline the creation of metadata in dataclass fields by formatting a standardized dict
@@ -235,3 +239,44 @@ class baseClass:
             out['options'] = options
         return(out)
     
+    @classmethod
+    def template(cls,kwargs={}):
+        signature = inspect.signature(cls.__init__)
+        for param in signature.parameters.values():
+            if param.name not in ['self'] and param.default is param.empty:
+                kwargs[param.name] = param.name
+        #hiddenDefaults implicit to baseclass
+        kwargs = kwargs | {'typeCheck':False,'readOnly':True,'fromFile':False}
+        template = cls.from_dict(kwargs)
+        templateFilePath = template.configFilePath
+        template = template.to_dict()
+        data = CommentedMap()
+        for key,value in template.items():
+            data[key] = value
+            fld = cls.__dataclass_fields__[key]
+            comment = f'type={fld.type.__name__};metadata={fld.metadata}'
+            if fld.default is MISSING:
+                comment = comment +f';default_factory={fld.default_factory}'
+            else:
+                comment = comment +f';default={fld.default}'
+            data.yaml_add_eol_comment(comment,key=key)
+        saveDict(data,templateFilePath,header=cls.__dataclass_fields__['header'].default)
+        return(templateFilePath)
+        
+    @classmethod
+    def fromTemplate(cls,template,base=None):
+        tmp = loadDict(fileName=template)
+        flds = []
+        for key in tmp.ca.items.keys():
+            cmt = (';'.join([c.value.strip('# ') for c in tmp.ca.items[key] if c is not None])).split(';')
+            cmt = {c.split('=')[0]:eval(c.split('=')[-1]) for c in cmt}
+            if 'default' in cmt:
+                flds.append((key,cmt['type'],field(default=cmt['default'],metadata=cmt['metadata'])))
+            else:
+                flds.append((key,cmt['type'],field(default_factory=cmt['default_factory'],metadata=cmt['metadata'])))
+
+            
+        Name = os.path.split(template)[-1].replace('.yml','')
+        if base is None:
+            base = (baseClass,)
+        return(make_dataclass(Name,cmt,kw_only=True))

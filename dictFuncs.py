@@ -10,7 +10,7 @@ ymlStartMarker = '\n---\n'
 
 
 from ruamel.yaml import YAML
-from ruamel.yaml.comments import CommentedMap
+# from ruamel.yaml.comments import CommentedMap
 
 yaml = YAML()
 

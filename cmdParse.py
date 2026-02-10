@@ -13,14 +13,15 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
     
-def cmdParse(defaultArgs):
+def cmdParse(defaultArgs,debug=False):
     # helper function to parse command line arguments
     CLI=argparse.ArgumentParser()
     dictArgs = []
     for key,val in defaultArgs.items():
         dt = type(val)
         nargs = "?"
-        print(key,val,dt)
+        if debug:
+            print(key,val,dt)
         if val == None:
             dt = str
         if dt == type({}):
@@ -40,5 +41,6 @@ def cmdParse(defaultArgs):
     for d in dictArgs:
         kwargs[d] = json.loads(kwargs[d])
         # replace booleans
-    print(kwargs)
+    if debug:
+        print(kwargs)
     return(kwargs)
