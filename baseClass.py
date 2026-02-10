@@ -232,6 +232,11 @@ class baseClass:
         })
     
     @classmethod
+    def from_yaml(cls,fpath):
+        env = loadDict(fileName=fpath)
+        return(cls.from_dict(env))
+
+    @classmethod
     def metadataMap(cls,description,options=None):
         # Streamline the creation of metadata in dataclass fields by formatting a standardized dict
         out = {'description':description}
@@ -289,4 +294,4 @@ class baseClass:
         Name = os.path.split(template)[-1].replace('.yml','')
         if base is None:
             base = (baseClass,)
-        return(make_dataclass(Name,flds,kw_only=True))
+        return(make_dataclass(Name,flds,bases=base,kw_only=True))
