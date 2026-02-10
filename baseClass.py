@@ -245,6 +245,7 @@ class baseClass:
         for param in signature.parameters.values():
             if param.name not in ['self'] and param.default is param.empty:
                 kwargs[param.name] = param.name
+                print(param.name)
         #hiddenDefaults implicit to baseclass
         kwargs = kwargs | {'typeCheck':False,'readOnly':True,'fromFile':False}
         template = cls.from_dict(kwargs)
@@ -261,7 +262,10 @@ class baseClass:
                 else:
                     comment = comment +f';default={fld.default}'
             elif fld.default_factory is not MISSING:
-                comment = comment +f';default_factory={fld.default_factory}'
+                if callable(fld.default_factory):
+                    comment = comment +f';default_factory={fld.default_factory()}'                    
+                else:
+                    comment = comment +f';default_factory={fld.default_factory}'
             data.yaml_add_eol_comment(comment,key=key)
         saveDict(data,templateFilePath,header=cls.__dataclass_fields__['header'].default)
         return(templateFilePath)
@@ -272,6 +276,7 @@ class baseClass:
         flds = []
         for key in tmp.ca.items.keys():
             cmt = (';'.join([c.value.strip('# ').rstrip('\n') for c in tmp.ca.items[key] if c is not None])).split(';')
+            print(cmt)
             cmt = {c.split('=')[0]: eval(c.split('=')[-1]) for c in cmt}
             if 'default' in cmt:
                 flds.append((key,cmt['type'],field(default=cmt['default'],metadata=cmt['metadata'])))
