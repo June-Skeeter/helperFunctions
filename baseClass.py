@@ -255,10 +255,6 @@ class baseClass:
             data[key] = value
             fld = cls.__dataclass_fields__[key]
             comment = f'type={fld.type.__name__};metadata={fld.metadata}'
-            if fld.default is MISSING:
-                comment = comment +f';default_factory={fld.default_factory}'
-            else:
-                comment = comment +f';default={fld.default}'
             data.yaml_add_eol_comment(comment,key=key)
         saveDict(data,templateFilePath,header=cls.__dataclass_fields__['header'].default)
         return(templateFilePath)
@@ -268,12 +264,14 @@ class baseClass:
         tmp = loadDict(fileName=template)
         flds = []
         for key in tmp.ca.items.keys():
-            cmt = (';'.join([c.value.strip('# ') for c in tmp.ca.items[key] if c is not None])).split(';')
+            cmt = (';'.join([c.value.strip('# ').rstrip('\n') for c in tmp.ca.items[key] if c is not None])).split(';')
             cmt = {c.split('=')[0]:eval(c.split('=')[-1]) for c in cmt}
             if 'default' in cmt:
                 flds.append((key,cmt['type'],field(default=cmt['default'],metadata=cmt['metadata'])))
-            else:
+            elif 'default_factory' in cmt:
                 flds.append((key,cmt['type'],field(default_factory=cmt['default_factory'],metadata=cmt['metadata'])))
+            else:
+                flds.append((key,cmt['type'],field(metadata=cmt['metadata'])))
 
             
         Name = os.path.split(template)[-1].replace('.yml','')
