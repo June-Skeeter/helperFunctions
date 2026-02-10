@@ -255,6 +255,13 @@ class baseClass:
             data[key] = value
             fld = cls.__dataclass_fields__[key]
             comment = f'type={fld.type.__name__};metadata={fld.metadata}'
+            if fld.default is not MISSING:
+                if fld.type is str and fld.default is not None:
+                    comment = comment +f';default="{fld.default}"'
+                else:
+                    comment = comment +f';default={fld.default}'
+            elif fld.default_factory is not MISSING:
+                comment = comment +f';default_factory={fld.default_factory}'
             data.yaml_add_eol_comment(comment,key=key)
         saveDict(data,templateFilePath,header=cls.__dataclass_fields__['header'].default)
         return(templateFilePath)
@@ -265,7 +272,7 @@ class baseClass:
         flds = []
         for key in tmp.ca.items.keys():
             cmt = (';'.join([c.value.strip('# ').rstrip('\n') for c in tmp.ca.items[key] if c is not None])).split(';')
-            cmt = {c.split('=')[0]:eval(c.split('=')[-1]) for c in cmt}
+            cmt = {c.split('=')[0]: eval(c.split('=')[-1]) for c in cmt}
             if 'default' in cmt:
                 flds.append((key,cmt['type'],field(default=cmt['default'],metadata=cmt['metadata'])))
             elif 'default_factory' in cmt:
@@ -277,4 +284,4 @@ class baseClass:
         Name = os.path.split(template)[-1].replace('.yml','')
         if base is None:
             base = (baseClass,)
-        return(make_dataclass(Name,cmt,kw_only=True))
+        return(make_dataclass(Name,flds,kw_only=True))
