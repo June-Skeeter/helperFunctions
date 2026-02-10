@@ -87,7 +87,7 @@ class parseCoordinates:
         self.geographicCoordinates = geographicCoordinates(latitude=self.latitude,longitude=self.longitude,datum=self.datum)
         self.latitude,self.longitude=self.geographicCoordinates.latitude,self.geographicCoordinates.longitude
         self.UTM = utmCoordinates(latitude=self.latitude,longitude=self.longitude,datum=self.datum)
-        self.geodataframe = gpd.GeoDataFrame(index=[self.UID],
+        self.projectedCoordinates = gpd.GeoDataFrame(index=[self.UID],
                                              data=self.attributes,
                                              geometry=gpd.points_from_xy([self.UTM.x],[self.UTM.y]),
                                              crs=self.UTM.EPSG)
