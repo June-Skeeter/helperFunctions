@@ -40,9 +40,6 @@ class baseClass:
 
     readOnly: bool = field(default=True,repr=False) # Only write config if readOnly == False or configFileExists=False
 
-    
-    # _inheritedMetadata: bool = field(default=True,repr=False,metadata={'description':'Date the configuration file was last modified.  Auto-generated, does not account for manual modifications by user.'})
-
     loadDict: Callable = field(default_factory=lambda: loadDict, repr=False, init=False)
     saveDict: Callable = field(default_factory=lambda: saveDict, repr=False, init=False)
 
@@ -56,11 +53,6 @@ class baseClass:
             if self.typeCheck:
                 self.inspectFields()
 
-    # def close(self):
-    #     if not self.readOnly or not self.configFileExists:
-    #         self.saveConfigFile()
-    #     return (self.logFile)
-        
     def inspectFields(self):
         for (name, field) in self.__dataclass_fields__.items():
             value = getattr(self, name, None)
