@@ -150,7 +150,7 @@ class baseClass:
         return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder))
 
     def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,verbose=None,majorOrder=1,minorOrder=1):
-        self.lastModified = self.modTime()
+        self.lastModified = self.currentTimeString()
         if verbose is None:
             verbose = self.verbose
         configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder)
@@ -162,7 +162,6 @@ class baseClass:
                 header=self.header
             else:
                 header=None
-            breakpoint()
             self.saveDict(
                 configDict,
                 fileName=self.configFilePath,
@@ -226,14 +225,18 @@ class baseClass:
         # Source - https://stackoverflow.com/a/55096964
         # Posted by Arne, modified by community. See post 'Timeline' for change history
         # Retrieved 2025-11-21, License - CC BY-SA 4.0    
-        return cls(**{
+        return(cls(**{
             k: v for k, v in env.items() 
             if k in inspect.signature(cls).parameters
-        })
+        }))
+        
     
     @classmethod
-    def from_yaml(cls,fpath):
-        env = loadDict(fileName=fpath)
+    def from_yaml(cls,fpath,kwargs={},kwargOverwrite=False):
+        if kwargOverwrite:
+            env = {'readOnly':True}|loadDict(fileName=fpath)|kwargs
+        else:
+            env = kwargs|loadDict(fileName=fpath)|{'readOnly':True}
         return(cls.from_dict(env))
 
     @classmethod
