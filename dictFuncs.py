@@ -66,7 +66,7 @@ def dcToDict(dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder
 
 # Load a dictionary a .json or .yml file
 # Preserve the header in a yaml file if desired
-def loadDict(fileName=None,template = {},returnHeader=False,verbose=False,traceback=False):
+def loadDict(fileName=None,template = {},returnHeader=False,verbose=False,traceback=False,preserveComments=False):
     fileName = os.path.abspath(fileName)
     if os.path.isfile(fileName):
         if fileName.endswith('.yml') or fileName.endswith('.yaml'):
@@ -79,6 +79,9 @@ def loadDict(fileName=None,template = {},returnHeader=False,verbose=False,traceb
                     header = None
             with open(fileName) as file:
                 out = yaml.load(file)
+                
+            if not preserveComments:
+                out = dict(out)
         elif fileName.endswith('.json'):
             with open(fileName) as file:
                 out = json.load(file)

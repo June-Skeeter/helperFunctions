@@ -215,6 +215,10 @@ class baseClass:
 
     def currentTimeString(self=None,fmt='%Y-%m-%dT%H:%M:%SZ'):
         return(datetime.now(timezone.utc).strftime(fmt))
+    
+    @classmethod
+    def requiredArgs(cls):
+        return([k for k,v in inspect.signature(cls.__init__).parameters.items() if v.default is v.empty and k != 'self'])
 
     @classmethod
     def from_class(cls,env,kwargs):
