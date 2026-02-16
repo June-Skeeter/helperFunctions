@@ -3,20 +3,43 @@ import inspect
 import dataclasses
 from types import MappingProxyType
 from dataclasses import dataclass, field, MISSING, make_dataclass
+from .parseCoordinates import parseCoordinates
 from typing import Iterable, Callable
-# from .parseCoordinates import parseCoordinates
 from .dictFuncs import dcToDict,saveDict,loadDict
-# from helperFunctions.dictFuncs import dcToDict,saveDict,loadDict
 from datetime import datetime, timezone
-# import dateparser
+import dateparser
 from inspect import currentframe
 from .log import log
 
 # from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+from zoneinfo import ZoneInfo
+
 
 # ruamel = YAML()
+# @dataclass
+class spatialObject:
 
+    def __init__(self,lat_lon):
+        if isinstance(lat_lon,list) and len(lat_lon) == 2:
+            if type(lat_lon[0]) is float and type(lat_lon[1]) is float:
+                self.lat_lon = lat_lon
+            else:
+                lat,lon=lat_lon[0],lat_lon[1]
+                self.parse(lat,lon)
+        elif isinstance(lat_lon,str) and ',' in lat_lon:
+            lat,lon=lat_lon.split(',')
+            self.parse(lat,lon)
+        elif lat_lon is not None:
+            breakpoint()
+            self.lat_lon = f'Could not parse {lat_lon}'
+        else:
+            self.lat_lon = None
+    
+
+    def parse(self,lat,lon):
+        pC = parseCoordinates(UID=None,latitude=lat,longitude=lon)
+        self.lat_lon = [pC.latitude, pC.longitude]
 
 # baseClass is a parent dataclass which gives enhanced functionality to dataclasses
 # * Supports type checking
@@ -24,7 +47,7 @@ from ruamel.yaml.comments import CommentedMap
 @dataclass
 class baseClass:
     UID: str = field(default=None,repr=False)
-    verbose: bool = field(default=False,repr=False) # Enable verbose output for type coercion warnings
+    verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
 
     typeCheck: bool = field(default=True,repr=False)
     message: str = field(default='',repr=False)
@@ -34,7 +57,7 @@ class baseClass:
     
     fromFile: bool = field(default=False,repr=False) # set to true to load from config file (if exists)
 
-    configReset: bool = field(default=False,repr=False)
+    # configReset: bool = field(default=False,repr=False)
     configFileExists: bool = field(default=False,repr=False)
     configFilePath: str = field(default=None,repr=False)
 
@@ -45,13 +68,32 @@ class baseClass:
 
     def __post_init__(self):
         if type(self).__name__ != 'baseClass':
-            if self.fromFile and os.path.exists(self.configFilePath) and not self.configReset:
-                self.loadFromConfigFile()
-                self.configFileExists = True
+            if self.fromFile and self.configFilePath is not None:
+                if os.path.exists(self.configFilePath):
+                    self.loadFromConfigFile()
+                    self.configFileExists = True
             if self.debug:
                 self.logMessage(f"Running: {type(self)}")
             if self.typeCheck:
                 self.inspectFields()
+                
+    # def formatUID(self,UID=None):
+    #     self.logMessage('Formatting UID?')
+    #     if self.UID is None:
+    #         if self.UID_link is None:
+    #             self.UID_link = UID
+    #         self.UID = getattr(self,self.UID_link)
+    #     if '_' not in self.UID or not self.UID.split('_')[-1].isnumeric():
+    #         self.UID = self.UID + '_1'
+
+    # def updateUID(self):
+    #     if '_' in self.UID and self.UID.split('_')[-1].isnumeric():
+    #         index = int(self.UID.split('_')[-1])+1
+    #         self.UID = self.UID.rsplit('_',1)[0]+'_'+str(index)
+    #     else:
+    #         self.formatUID()
+    #     if self.UID_link is not None:
+    #         setattr(self,self.UID_link,self.UID)
 
     def inspectFields(self):
         for (name, field) in self.__dataclass_fields__.items():
@@ -63,39 +105,37 @@ class baseClass:
         field_type = field.type
         if not isinstance(value, field_type) and value is not None:
             current_type = type(value)
-            self.logWarning(f"\nType mismatch for field: `{name}`\nExpected input of {field_type.__name__}, received input of {current_type.__name__}\nAttempting to coerce value: {value}",hold=True)
-            if dataclasses.is_dataclass(value) and hasattr(value,'to_dict'):
-                setattr(self,name,value.to_dict())               
+            if field_type is datetime:
+                if hasattr(self,'timezone'):
+                    kwargs = {'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':True,'TIMEZONE':str(ZoneInfo(self.timezone))}
+                else:
+                    kwargs = {'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':False}
+                self.logWarning(f'The datetime object {name}:{value} will be parsed as with: {kwargs}',hold=True)
+                setattr(self,name,dateparser.parse(value,settings=kwargs))
+                self.logWarning(f'Confirm variable coerced correctly: {getattr(self,name)}')
+            elif field_type is spatialObject:
+                setattr(self,name,spatialObject(value).lat_lon)
+            elif dataclasses.is_dataclass(value) and hasattr(value,'to_dict'):
+                setattr(self,name,value.to_dict())     
             elif hasattr(field_type, '__module__') and field_type.__module__ == 'builtins':
+                self.logWarning(f"\nType mismatch for field: `{name}`\nExpected input of {field_type.__name__}, received input of {current_type.__name__}\nAttempting to coerce value: {value}",hold=True)
                 try:
-                    if type(value) is str and field_type is list:
+                    if isinstance(value,str) and field_type is list:
                         setattr(self,name,[value])
                     else:
                         setattr(self, name,  field_type(value))
-                    if not current_type is int and not field_type is float:
+                    if not isinstance(current_type,int) and not field_type is float:
                         self.logWarning(f'Confirm variable coerced correctly: {value}')
                 except:
                     self.logError(f"The field `{name}` was assigned by `{current_type.__name__}` instead of `{field_type.__name__}` and could not be coerced to required type.")
             elif dataclasses.is_dataclass(self.__dataclass_fields__[name].default_factory):
-                self.logMessage(f'Parsing nested dataclass: {name}')
+                self.logMessage(f'Parsing nested dataclass: {name}, is this assumption too complicated?')
+                breakpoint()
                 setattr(self,name,self.__dataclass_fields__[name].default_factory(**value))
             elif self.verbose:
                 self.logError(f'Coercion failed for {name} \nCannot coerce custom type: {field_type}')
     
     def checkMetadata(self,name,value,field):
-        # if self._inheritedMetadata:
-        #     # Ensure metadata are not overwritten 
-        #     if not field.metadata:
-        #         middleClasses = [mc for mc in type(self).__mro__[1:-2]]
-        #         for mc in middleClasses:
-        #             if name in mc.__annotations__.keys():
-        #                 self.__dataclass_fields__[name].metadata = mc.__dataclass_fields__[name].metadata
-        #     elif hasattr(self,'defaultMD'):
-        #         md = dict(field.metadata)
-        #         for k,v in self.defaultMD.items():
-        #             if k not in md.keys():
-        #                 md[k] = v
-        #         self.__dataclass_fields__[name].metadata = MappingProxyType(md)
         if 'options' in field.metadata:
             if isinstance(field.metadata['options'],Iterable):
                 if value in field.metadata['options']:
@@ -107,8 +147,8 @@ class baseClass:
 
                 elif value is not None:
                     self.logWarning('Options currently only enabled for string types')
-                    self.logChoice('Proceed with interactive debug session')
-                    breakpoint()
+                    if self.logChoice('Proceed with interactive debug session'):
+                        breakpoint()
             else:
                 if value != field.metadata['options']:
                     self.logError(msg=f'{name} must be {field.metadata["options"]}')
@@ -123,6 +163,7 @@ class baseClass:
             # Overwrite defaults
             if key not in self.__dataclass_fields__.keys():
                 self.logError(f'Does not accept generic undefined parameters,\n {key} field must be added to source code')
+                breakpoint()
             elif key in defaultOverwrites:
                 setattr(self,key,value)
             elif key not in self.__dict__.keys():
@@ -147,8 +188,8 @@ class baseClass:
             verbose = self.verbose
         configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder)
         if not self.configFilePath:
-            self.logMessage('No filepath provided, only returning config dictionary')
-        else:
+            self.logError('No configFilePath provided')
+        elif not self.readOnly:
             self.logMessage(f"Saving: {self.configFilePath}")
             if hasattr(self,'header') and self.header is not None:
                 header=self.header
@@ -159,7 +200,9 @@ class baseClass:
                 fileName=self.configFilePath,
                 header=header
                 )
-            
+        else:
+            self.logMessage(f'readOnly={self.readOnly}, not saving {self.configFilePath}')
+
     def logError(self,msg='',traceback=True,kill=True,verbose=None):
         if verbose is None:
             verbose = self.verbose
@@ -179,23 +222,21 @@ class baseClass:
             self.updateLog(out)
 
 
-    def logChoice(self,msg,proceed='Y',verbose=None):
-        # if verbose is None:
-        #     verbose = self.verbose
+    def logChoice(self,msg,proceed='Y',kill=False):
         out = log(msg=msg,cf=currentframe(),verbose=True)
+        self.updateLog(out)
         i = input(f'Enter {proceed} to continue or any other key to exit: ')
         if i == proceed:
-            return
+            return (True)
+        elif kill:
+            log(msg='Exiting',kill=kill)
         else:
-            log(msg='Exiting',kill=True)
-        self.updateLog(out)
+            return (False)
 
 
     def logMessage(self,msg,verbose=None,traceback=False):
         if verbose is None:
             verbose = self.verbose
-        # if not verbose:
-        #     breakpoint()
         out = log(f"{msg}\n",traceback=traceback,verbose=verbose,cf=currentframe())
         self.updateLog(out)
 
@@ -249,7 +290,6 @@ class baseClass:
         for param in signature.parameters.values():
             if param.name not in ['self'] and param.default is param.empty:
                 kwargs[param.name] = param.name
-                print(param.name)
         #hiddenDefaults implicit to baseclass
         kwargs = kwargs | {'typeCheck':False,'readOnly':True,'fromFile':False}
         template = cls.from_dict(kwargs)
@@ -280,7 +320,6 @@ class baseClass:
         flds = []
         for key in tmp.ca.items.keys():
             cmt = (';'.join([c.value.strip('# ').rstrip('\n') for c in tmp.ca.items[key] if c is not None])).split(';')
-            print(cmt)
             cmt = {c.split('=')[0]: eval(c.split('=')[-1]) for c in cmt}
             if 'default' in cmt:
                 flds.append((key,cmt['type'],field(default=cmt['default'],metadata=cmt['metadata'])))

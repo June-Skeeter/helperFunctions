@@ -8,9 +8,10 @@ from .log import log
 import copy
 ymlStartMarker = '\n---\n'
 
-
 from ruamel.yaml import YAML
 # from ruamel.yaml.comments import CommentedMap
+
+from dataclasses import is_dataclass
 
 yaml = YAML()
 
@@ -51,15 +52,24 @@ def dcToDict(dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder
         (keepNull or not optional[k] or getattr(dc, k) is not None) and # Apply null filter if applicable
         (fields[k].repr or not repr) # Apply repr filter if applicable
     }
-    # Move iterables to back to increase readability of yaml files
+    # Move iterables to back (lists then dicts) to increase readability of yaml files
     toBack = {}
+    toMiddle = {}
     toFront = {}
     for key,value in cleanOutput.items():
+        if is_dataclass(value):
+            if hasattr(value,'to_dict'):
+                value = dcToDict(value,repr,inheritance,keepNull,majorOrder,minorOrder)
+            else:
+                log(f'**Warning**:\n{key} is a dataclass, this can lead to serialization errors')
         if type(value) is not str and isinstance(value,Iterable):
-            toBack[key] = value
+            if isinstance(value,list):
+                toMiddle[key] = value
+            else:
+                toBack[key] = value
         else:
             toFront[key] = value
-    finalOutput = toFront | toBack
+    finalOutput = toFront | toMiddle | toBack
     return finalOutput
 
 
@@ -104,9 +114,7 @@ def saveDict(obj,fileName,header=None,sort_keys=False,indent=None,anchors=False)
         os.makedirs(os.path.split(fileName)[0])
 
     with open(fileName,'w') as file:
-        # breakpoint()
         if fileName.endswith('.yml'):
-            # print(fileName)
             if header:
                 header = '\n'.join([h if h.startswith('#') else '# '+h for h in header.split('\n')])
                 file.write(header+ymlStartMarker)
