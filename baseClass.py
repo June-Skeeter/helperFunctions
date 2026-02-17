@@ -179,14 +179,14 @@ class baseClass:
                         self.logWarning(f'Overwriting value in {key}')
 
         
-    def to_dict(self,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1):
-        return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder))
+    def to_dict(self,repr=True,inheritance=True,keepNull=True,sorted=False):
+        return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted))
 
-    def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,verbose=None,majorOrder=1,minorOrder=1):
+    def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,verbose=None,sorted=True):
         self.lastModified = self.currentTimeString()
         if verbose is None:
             verbose = self.verbose
-        configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,majorOrder=majorOrder,minorOrder=minorOrder)
+        configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted)
         if not self.configFilePath:
             self.logError('No configFilePath provided')
         elif not self.readOnly:
@@ -266,7 +266,6 @@ class baseClass:
             k: v for k, v in env.items() 
             if k in inspect.signature(cls).parameters
         }))
-        
     
     @classmethod
     def from_yaml(cls,fpath,kwargs={},kwargOverwrite=False):

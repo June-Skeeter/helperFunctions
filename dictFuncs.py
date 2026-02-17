@@ -32,7 +32,7 @@ yaml = YAML()
 #   * False - exclude values if they are None
 
 
-def dcToDict(dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1):
+def dcToDict(dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1,sorted=True):
     fields = dc.__dataclass_fields__
     # Keys of child class
     if inheritance:
@@ -52,6 +52,21 @@ def dcToDict(dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder
         (keepNull or not optional[k] or getattr(dc, k) is not None) and # Apply null filter if applicable
         (fields[k].repr or not repr) # Apply repr filter if applicable
     }
+    if sorted:
+        keyList = list(cleanOutput.keys())
+        if sorted == 'default':
+            keyList.sort()
+        elif sorted == 'ignoreCase':
+            keyList.sort(key=lambda v: v.upper())
+        else:
+            keyList.sort(key=lambda v: v.upper())
+            if hasattr(type(dc),'requiredArgs'):
+                ra = [r for r in type(dc).requiredArgs() if dc.__dataclass_fields__[r].repr]
+                ra.sort(key=lambda v: v.upper())
+                if len(ra) > 0:
+                    keyList = ra + [k for k in keyList if k not in ra]
+        sortedOutput = {key:cleanOutput[key] for key in keyList}
+        cleanOutput = sortedOutput
     # Move iterables to back (lists then dicts) to increase readability of yaml files
     toBack = {}
     toMiddle = {}
@@ -59,7 +74,7 @@ def dcToDict(dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder
     for key,value in cleanOutput.items():
         if is_dataclass(value):
             if hasattr(value,'to_dict'):
-                value = dcToDict(value,repr,inheritance,keepNull,majorOrder,minorOrder)
+                value = dcToDict(value,repr,inheritance,keepNull,majorOrder,minorOrder,sorted)
             else:
                 log(f'**Warning**:\n{key} is a dataclass, this can lead to serialization errors')
         if type(value) is not str and isinstance(value,Iterable):
