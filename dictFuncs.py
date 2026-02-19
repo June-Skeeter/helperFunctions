@@ -32,7 +32,7 @@ yaml = YAML()
 #   * False - exclude values if they are None
 
 
-def dcToDict(dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1,sorted=True):
+def dcToDict(dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1,sorted=False):
     fields = dc.__dataclass_fields__
     # Keys of child class
     if inheritance:

@@ -5,7 +5,7 @@ from types import MappingProxyType
 from dataclasses import dataclass, field, MISSING, make_dataclass
 from .parseCoordinates import parseCoordinates
 from typing import Iterable, Callable
-from .dictFuncs import dcToDict,saveDict,loadDict
+from .dictFuncs import dcToDict,saveDict,loadDict,unpackDict
 from datetime import datetime, timezone
 import dateparser
 from inspect import currentframe
@@ -65,6 +65,7 @@ class baseClass:
 
     loadDict: Callable = field(default_factory=lambda: loadDict, repr=False, init=False)
     saveDict: Callable = field(default_factory=lambda: saveDict, repr=False, init=False)
+    unpackDict: Callable = field(default_factory=lambda: unpackDict, repr=False, init=False)
 
     def __post_init__(self):
         if type(self).__name__ != 'baseClass':
