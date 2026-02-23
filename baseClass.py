@@ -2,10 +2,10 @@ import os
 import inspect
 import dataclasses
 from types import MappingProxyType
-from dataclasses import dataclass, field, MISSING, make_dataclass
+from dataclasses import dataclass, field, MISSING, make_dataclass, asdict
 from .parseCoordinates import parseCoordinates
 from typing import Iterable, Callable
-from .dictFuncs import dcToDict,saveDict,loadDict,unpackDict
+from .dictFuncs import sortDict,saveDict,loadDict,unpackDict
 from datetime import datetime, timezone
 import dateparser
 from inspect import currentframe
@@ -47,7 +47,7 @@ class spatialObject:
 @dataclass
 class baseClass:
     UID: str = field(default=None,repr=False)
-    verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
+    verbose: bool = field(default=False,repr=False) # Enable verbose output for type coercion warnings
 
     typeCheck: bool = field(default=True,repr=False)
     message: str = field(default='',repr=False)
@@ -57,11 +57,10 @@ class baseClass:
     
     fromFile: bool = field(default=False,repr=False) # set to true to load from config file (if exists)
 
-    # configReset: bool = field(default=False,repr=False)
-    configFileExists: bool = field(default=False,repr=False)
     configFilePath: str = field(default=None,repr=False)
 
     readOnly: bool = field(default=True,repr=False) # Only write config if readOnly == False or configFileExists=False
+    readOnlyOverwrite: bool = field(default=True,repr=False) # Overwrite readOnly for one operation
 
     loadDict: Callable = field(default_factory=lambda: loadDict, repr=False, init=False)
     saveDict: Callable = field(default_factory=lambda: saveDict, repr=False, init=False)
@@ -72,29 +71,11 @@ class baseClass:
             if self.fromFile and self.configFilePath is not None:
                 if os.path.exists(self.configFilePath):
                     self.loadFromConfigFile()
-                    self.configFileExists = True
             if self.debug:
                 self.logMessage(f"Running: {type(self)}")
             if self.typeCheck:
                 self.inspectFields()
                 
-    # def formatUID(self,UID=None):
-    #     self.logMessage('Formatting UID?')
-    #     if self.UID is None:
-    #         if self.UID_link is None:
-    #             self.UID_link = UID
-    #         self.UID = getattr(self,self.UID_link)
-    #     if '_' not in self.UID or not self.UID.split('_')[-1].isnumeric():
-    #         self.UID = self.UID + '_1'
-
-    # def updateUID(self):
-    #     if '_' in self.UID and self.UID.split('_')[-1].isnumeric():
-    #         index = int(self.UID.split('_')[-1])+1
-    #         self.UID = self.UID.rsplit('_',1)[0]+'_'+str(index)
-    #     else:
-    #         self.formatUID()
-    #     if self.UID_link is not None:
-    #         setattr(self,self.UID_link,self.UID)
 
     def inspectFields(self):
         for (name, field) in self.__dataclass_fields__.items():
@@ -180,8 +161,32 @@ class baseClass:
                         self.logWarning(f'Overwriting value in {key}')
 
         
-    def to_dict(self,repr=True,inheritance=True,keepNull=True,sorted=False):
-        return(dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted))
+    def to_dict(self,repr=True,inheritance=True,keepNull=True,sorted=False,onlyID=False):
+        def factory(data):
+            def format(x):
+                if hasattr(x,'isoformat'):
+                    return(x.isoformat())
+                else:
+                    return(x)
+            return({
+                key:format(value) for key,value in data
+                if (keepNull or value is not None)
+            })
+
+            
+        data = asdict(self,dict_factory=factory)
+        if inheritance == False:
+            annotationKeys = self.__annotations__.keys()
+        if onlyID == True:
+            data = {key:data[key] for key in self.requiredArgs()}
+            repr = None
+        if repr is not None:
+            for key,value in self.__dataclass_fields__.items():
+                if key in data:
+                    if value.repr != repr or (inheritance == False and key not in annotationKeys):
+                        data.pop(key)
+        data = sortDict(data,sorted=sorted)
+        return(data)
 
     def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,verbose=None,sorted=True):
         self.lastModified = self.currentTimeString()
@@ -201,6 +206,10 @@ class baseClass:
                 fileName=self.configFilePath,
                 header=header
                 )
+            # Set readOnly to an arbitrary string to allow temporary write permissions (e.g. creating a new file )
+            if type(self.readOnlyOverwrite):
+                self.readOnly = True
+                self.readOnlyOverwrite = False
         else:
             self.logMessage(f'readOnly={self.readOnly}, not saving {self.configFilePath}')
 

@@ -31,8 +31,33 @@ yaml = YAML()
 #   * True - include all values
 #   * False - exclude values if they are None
 
+def sortDict(obj,sorted=False):
+    
+    if sorted:
+        keyList = list(obj.keys())
+        if sorted == True:
+            keyList.sort()
+        elif sorted == 'ignoreCase':
+            keyList.sort(key=lambda v: v.upper())
+        sortedOutput = {key:obj[key] for key in keyList}
+        obj = sortedOutput
+    # Move iterables to back (lists then dicts) to increase readability of yaml files
+    toBack = {}
+    toMiddle = {}
+    toFront = {}
+    for key,value in obj.items():
+        if type(value) is not str and isinstance(value,Iterable):
+            if isinstance(value,list):
+                toMiddle[key] = value
+            else:
+                toBack[key] = value
+        else:
+            toFront[key] = value
+    finalOutput = toFront | toMiddle | toBack
+    return(finalOutput)
 
 def dcToDict(dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1,sorted=False):
+    print('This method is depreciated!')
     fields = dc.__dataclass_fields__
     # Keys of child class
     if inheritance:
