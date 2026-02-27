@@ -342,3 +342,6 @@ class baseClass:
         if base is None:
             base = (baseClass,)
         return(make_dataclass(Name,flds,bases=base,kw_only=True))
+
+
+mdMap = baseClass.metadataMap
