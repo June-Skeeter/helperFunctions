@@ -7,13 +7,12 @@ from typing import Iterable
 from .log import log
 import copy
 ymlStartMarker = '\n---\n'
-
-from ruamel.yaml import YAML
+import ruamel.yaml
 # from ruamel.yaml.comments import CommentedMap
 
 from dataclasses import is_dataclass
 
-yaml = YAML()
+yaml = ruamel.yaml.YAML()
 
 
 # Convert a dataclass to a dictionary
@@ -147,7 +146,7 @@ def loadDict(fileName=None,template = {},returnHeader=False,verbose=False,traceb
 
 # Save a dictionary to json or yaml format
 # Preserve yaml header if desired
-def saveDict(obj,fileName,header=None,sort_keys=False,indent=None,anchors=False):
+def saveDict(obj,fileName,header=None,sort_keys=False,indent=None,anchors=False,multiLineStrings=True):
     if os.path.split(fileName)[0] == '':
         pass
     elif not os.path.isdir(os.path.split(fileName)[0]):
@@ -158,6 +157,8 @@ def saveDict(obj,fileName,header=None,sort_keys=False,indent=None,anchors=False)
             if header:
                 header = '\n'.join([h if h.startswith('#') else '# '+h for h in header.split('\n')])
                 file.write(header+ymlStartMarker)
+            if multiLineStrings:
+                ruamel.yaml.scalarstring.walk_tree(obj)
             if anchors:
                 yaml.dump(obj,file)
             else:
