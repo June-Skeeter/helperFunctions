@@ -172,8 +172,11 @@ class baseClass:
                 key:format(value) for key,value in data
                 if (keepNull or value is not None)
             })
-
-            
+        if self.debug:
+            for key in self.__dataclass_fields__:
+                v = getattr(self,key)
+                print(key,type(v))
+            breakpoint()
         data = asdict(self,dict_factory=factory)
         if inheritance == False:
             annotationKeys = self.__annotations__.keys()
