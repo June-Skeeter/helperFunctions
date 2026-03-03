@@ -5,7 +5,7 @@ from types import MappingProxyType
 from dataclasses import dataclass, field, MISSING, make_dataclass, asdict
 from .parseCoordinates import parseCoordinates
 from typing import Iterable, Callable
-from .dictFuncs import sortDict,saveDict,loadDict,unpackDict
+from .dictFuncs import sortDict,saveDict,loadDict,unpackDict#,updateDict
 from datetime import datetime, timezone
 import dateparser
 from inspect import currentframe
@@ -65,6 +65,8 @@ class baseClass:
     loadDict: Callable = field(default_factory=lambda: loadDict, repr=False, init=False)
     saveDict: Callable = field(default_factory=lambda: saveDict, repr=False, init=False)
     unpackDict: Callable = field(default_factory=lambda: unpackDict, repr=False, init=False)
+    # updateDict: Callable = field(default_factory=lambda: updateDict, repr=False, init=False)
+    sortDict: Callable = field(default_factory=lambda: sortDict, repr=False, init=False)
 
     def __post_init__(self):
         if type(self).__name__ != 'baseClass':
@@ -188,7 +190,7 @@ class baseClass:
                 if key in data:
                     if value.repr != repr or (inheritance == False and key not in annotationKeys):
                         data.pop(key)
-        data = sortDict(data,sorted=sorted)
+        data = self.sortDict(data,sorted=sorted)
         return(data)
 
     def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,verbose=None,sorted=True):
