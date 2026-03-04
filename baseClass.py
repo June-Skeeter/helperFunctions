@@ -38,7 +38,7 @@ class spatialObject:
     
 
     def parse(self,lat,lon):
-        pC = parseCoordinates(UID=None,latitude=lat,longitude=lon)
+        pC = parseCoordinates(latitude=lat,longitude=lon)
         self.lat_lon = [pC.latitude, pC.longitude]
 
 # baseClass is a parent dataclass which gives enhanced functionality to dataclasses
@@ -46,10 +46,9 @@ class spatialObject:
 # * Reading and writing from yaml files (with type checking)
 @dataclass
 class baseClass:
-    UID: str = field(default=None,repr=False)
     verbose: bool = field(default=False,repr=False) # Enable verbose output for type coercion warnings
 
-    typeCheck: bool = field(default=True,repr=False)
+    typeCheck: bool = field(default=False,repr=False)
     message: str = field(default='',repr=False)
     logFile: str = field(default=f"Log file: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}\n",repr=False)
 
@@ -60,7 +59,7 @@ class baseClass:
     configFilePath: str = field(default=None,repr=False)
 
     readOnly: bool = field(default=True,repr=False) # Only write config if readOnly == False or configFileExists=False
-    readOnlyOverwrite: bool = field(default=True,repr=False) # Overwrite readOnly for one operation
+    temporaryWritePermission: bool = field(default=False,repr=False) # Overwrite readOnly for one operation
 
     loadDict: Callable = field(default_factory=lambda: loadDict, repr=False, init=False)
     saveDict: Callable = field(default_factory=lambda: saveDict, repr=False, init=False)
@@ -80,6 +79,7 @@ class baseClass:
                 
 
     def inspectFields(self):
+        self.logMessage(f'type-checking inputs: {type(self).__name__}')
         for (name, field) in self.__dataclass_fields__.items():
             value = getattr(self, name, None)
             self.typeEnforcement(name,value,field)
@@ -87,7 +87,10 @@ class baseClass:
             
     def typeEnforcement(self,name,value,field):
         field_type = field.type
-        if not isinstance(value, field_type) and value is not None:
+        if isinstance(field_type,type(callable)):
+            if isinstance(value,dict):
+                setattr(self,name,field.default_factory(**value))
+        if not isinstance(field_type,type(callable)) and not isinstance(value, field_type) and value is not None:
             current_type = type(value)
             if field_type is datetime:
                 if hasattr(self,'timezone'):
@@ -193,28 +196,28 @@ class baseClass:
         data = self.sortDict(data,sorted=sorted)
         return(data)
 
-    def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,verbose=None,sorted=True):
-        self.lastModified = self.currentTimeString()
-        if verbose is None:
-            verbose = self.verbose
-        configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted)
-        if not self.configFilePath:
-            self.logError('No configFilePath provided')
-        elif not self.readOnly:
-            self.logMessage(f"Saving: {self.configFilePath}")
+    def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,sorted=True,debug=False):
+        if debug:
+            breakpoint()
+        if self.temporaryWritePermission and self.readOnly:
+            self.readOnly = False
+        else:
+            self.temporaryWritePermission = False
+        if not self.readOnly:
+            if not self.configFilePath:
+                self.logError('No configFilePath provided')
+            else:
+                self.logMessage(f"Saving: {self.configFilePath}")
+            self.lastModified = self.currentTimeString()
+            configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted)
             if hasattr(self,'header') and self.header is not None:
                 header=self.header
             else:
                 header=None
-            self.saveDict(
-                configDict,
-                fileName=self.configFilePath,
-                header=header
-                )
-            # Set readOnly to an arbitrary string to allow temporary write permissions (e.g. creating a new file )
-            if type(self.readOnlyOverwrite):
+            self.saveDict(configDict,fileName=self.configFilePath,header=header)
+            if self.temporaryWritePermission:
                 self.readOnly = True
-                self.readOnlyOverwrite = False
+                self.temporaryWritePermission = False
         else:
             self.logMessage(f'readOnly={self.readOnly}, not saving {self.configFilePath}')
 
@@ -281,7 +284,7 @@ class baseClass:
             k: v for k, v in env.items() 
             if k in inspect.signature(cls).parameters
         }))
-    
+        
     @classmethod
     def from_yaml(cls,fpath,kwargs={},kwargOverwrite=False):
         if kwargOverwrite:
