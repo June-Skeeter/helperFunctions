@@ -4,8 +4,15 @@ import string
 printable = set(string.printable)
 
 # Formats string to be printable
-def cleanString(stringIn):
-    stringOut = ''.join(filter(lambda x: x in printable, stringIn))
+def cleanString(stringIn,repKey={},passKey=set()):
+    if isinstance(passKey,str):
+        passKey=set(passKey)
+    elif isinstance(passKey,list):
+        passKey=set(passKey)
+    passKey.update(printable)
+    for k,v in repKey.items():
+        stringIn = stringIn.replace(k,v)
+    stringOut = ''.join(filter(lambda x: x in passKey, stringIn))
     return(stringOut)
 
 

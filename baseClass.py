@@ -5,7 +5,7 @@ from types import MappingProxyType
 from dataclasses import dataclass, field, MISSING, make_dataclass, asdict
 from .parseCoordinates import parseCoordinates
 from typing import Iterable, Callable
-from .dictFuncs import sortDict,saveDict,loadDict,unpackDict#,updateDict
+from .dictFuncs import dictFuncs
 from datetime import datetime, timezone
 import dateparser
 from inspect import currentframe
@@ -45,27 +45,16 @@ class spatialObject:
 # * Supports type checking
 # * Reading and writing from yaml files (with type checking)
 @dataclass
-class baseClass:
-    verbose: bool = field(default=False,repr=False) # Enable verbose output for type coercion warnings
-
+class baseClass(dictFuncs):
+    verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
     typeCheck: bool = field(default=False,repr=False)
     message: str = field(default='',repr=False)
-    logFile: str = field(default=f"Log file: {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}\n",repr=False)
-
     debug: bool = field(default=False,repr=False)
-    
     fromFile: bool = field(default=False,repr=False) # set to true to load from config file (if exists)
-
     configFilePath: str = field(default=None,repr=False)
-
     readOnly: bool = field(default=True,repr=False) # Only write config if readOnly == False or configFileExists=False
     temporaryWritePermission: bool = field(default=False,repr=False) # Overwrite readOnly for one operation
 
-    loadDict: Callable = field(default_factory=lambda: loadDict, repr=False, init=False)
-    saveDict: Callable = field(default_factory=lambda: saveDict, repr=False, init=False)
-    unpackDict: Callable = field(default_factory=lambda: unpackDict, repr=False, init=False)
-    # updateDict: Callable = field(default_factory=lambda: updateDict, repr=False, init=False)
-    sortDict: Callable = field(default_factory=lambda: sortDict, repr=False, init=False)
 
     def __post_init__(self):
         if type(self).__name__ != 'baseClass':
@@ -166,22 +155,24 @@ class baseClass:
                         self.logWarning(f'Overwriting value in {key}')
 
         
-    def to_dict(self,repr=True,inheritance=True,keepNull=True,sorted=False,onlyID=False):
+    def to_dict(self,repr=True,inheritance=True,keepNull=True,sorted=False,onlyID=False,debug=False):
         def factory(data):
             def format(x):
                 if hasattr(x,'isoformat'):
                     return(x.isoformat())
+                elif callable(x):
+                    return(x.__name__)
                 else:
                     return(x)
             return({
                 key:format(value) for key,value in data
                 if (keepNull or value is not None)
             })
-        if self.debug:
-            for key in self.__dataclass_fields__:
-                v = getattr(self,key)
-                print(key,type(v))
-            breakpoint()
+        # if self.debug:
+        #     for key in self.__dataclass_fields__:
+        #         v = getattr(self,key)
+        #         print(key,type(v))
+        #     breakpoint()
         data = asdict(self,dict_factory=factory)
         if inheritance == False:
             annotationKeys = self.__annotations__.keys()
@@ -197,8 +188,8 @@ class baseClass:
         return(data)
 
     def saveConfigFile(self,repr=True,inheritance=True,keepNull=True,sorted=True,debug=False):
-        if debug:
-            breakpoint()
+        # if debug:
+        #     breakpoint()
         if self.temporaryWritePermission and self.readOnly:
             self.readOnly = False
         else:
@@ -209,7 +200,7 @@ class baseClass:
             else:
                 self.logMessage(f"Saving: {self.configFilePath}")
             self.lastModified = self.currentTimeString()
-            configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted)
+            configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted,debug=debug)
             if hasattr(self,'header') and self.header is not None:
                 header=self.header
             else:
@@ -225,7 +216,6 @@ class baseClass:
         if verbose is None:
             verbose = self.verbose
         out = log(msg=f'\n\n{"*"*11} Error {"*"*11}\n{msg}\n{"*"*10} Exiting {"*"*10}\n',traceback=traceback,kill=kill,cf=currentframe(),verbose=verbose)
-        self.updateLog(out)
 
     def logWarning(self,msg='',hold=False,traceback=False,verbose=None):
         if verbose is None:
@@ -237,12 +227,10 @@ class baseClass:
         if not hold:
             out = log(msg=f'{"*"*10} Warning {"*"*10}\n{self.message}\n',traceback=traceback,cf=currentframe(),verbose=verbose)
             self.message = ''
-            self.updateLog(out)
 
 
     def logChoice(self,msg,proceed='Y',kill=False):
         out = log(msg=msg,cf=currentframe(),verbose=True)
-        self.updateLog(out)
         i = input(f'Enter {proceed} to continue or any other key to exit: ')
         if i == proceed:
             return (True)
@@ -251,18 +239,10 @@ class baseClass:
         else:
             return (False)
 
-
     def logMessage(self,msg,verbose=None,traceback=False):
         if verbose is None:
             verbose = self.verbose
-        out = log(f"{msg}\n",traceback=traceback,verbose=verbose,cf=currentframe())
-        self.updateLog(out)
-
-
-    def updateLog(self,out):
-        if out.startswith('Log file: '):
-            out = out.split('\n',1)[-1]
-        self.logFile=self.logFile+'\n'+out
+        out = log(f"{msg}",traceback=traceback,verbose=verbose,cf=currentframe())
 
     def currentTimeString(self=None,fmt='%Y-%m-%dT%H:%M:%SZ'):
         return(datetime.now(timezone.utc).strftime(fmt))
@@ -288,9 +268,9 @@ class baseClass:
     @classmethod
     def from_yaml(cls,fpath,kwargs={},kwargOverwrite=False):
         if kwargOverwrite:
-            env = {'readOnly':True}|loadDict(fileName=fpath)|kwargs
+            env = {'readOnly':True}|cls.loadDict(None,fileName=fpath)|kwargs
         else:
-            env = kwargs|loadDict(fileName=fpath)|{'readOnly':True}
+            env = kwargs|cls.loadDict(None,fileName=fpath)|{'readOnly':True}
         return(cls.from_dict(env))
 
     @classmethod
