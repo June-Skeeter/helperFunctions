@@ -1,7 +1,6 @@
 import json
 import argparse
 
-
 def str2bool(v):
     # credit: https://stackoverflow.com/a/43357954/5683778
     if isinstance(v, bool):
