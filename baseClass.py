@@ -165,26 +165,22 @@ class baseFunctions(baseClassMethods):
 
     def currentTimeString(self=None,fmt='%Y-%m-%dT%H:%M:%SZ'):
         return(datetime.now(timezone.utc).strftime(fmt))
-
-    def checkType(self,fieldValues,coerce=False):
-        attributes = {key:{'type':value.type,'value':getattr(self,key,None)} for key,value in fieldValues.items()}
-        # print(attributes)
-        for name,item in attributes.items():
-            conditions = (item['value'] is None or
-               (callable(item['type']) and callable(item['value']) or dataclasses.is_dataclass(item['value'])) or
-               isinstance(item['value'],item['type']))
-            if conditions and coerce:
-                self.coerceType(name,item['type'],item['value'])
-            elif conditions and not coerce:
-                self.logError(f'Type check failed: {name} of type {item["type"]}',traceback=True)
     
-    def coerceType(self,name,dtype,value):
+    def coerceType(self,name,dtype,value,default=None):
+        # Simple cases
         if dtype in [bool,str,int,float]:
             setattr(self,name,dtype(value))
+        # Custom for datetimes
         elif dtype is datetime:
             self.parseDatetime(name,value)
+        # Custom spatial data
+        elif dtype is spatialObject:
+            setattr(self,name,spatialObject(value).lat_lon)
+        # Custom for nested dataclasses with dict inputs
+        elif dataclasses.is_dataclass(default) and isinstance(value,dict):
+            setattr(self,name,default(**value))
         else:
-            print('More complex type: ',name, dtype,value)
+            self.logMessage(f'More complex type, add method to handle: {name, dtype,value}')
             breakpoint()
 
     def parseDatetime(self,name,value):
@@ -195,8 +191,7 @@ class baseFunctions(baseClassMethods):
         self.logWarning(f'The datetime object {name}:{value} will be parsed as with: {kwargs}',hold=True)
         setattr(self,name,dateparser.parse(value,settings=kwargs))
         self.logWarning(f'Confirm variable coerced correctly: {getattr(self,name)}')
-            
-            
+
 
 mdMap = baseClassMethods.metadataMap
 
@@ -206,178 +201,44 @@ class baseDataClass(baseFunctions):
     verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
     typeEnforce: bool = field(default=True,repr=False) # Enable type enforcement
     typeCoercion: bool = field(default=True,repr=False) # Enable type coercion if fails type check
+    optionEnforce: bool = field(default=True,repr=False)
 
     def __post_init__(self):
+        fields = self.__dataclass_fields__
         if self.typeEnforce:
-            self.checkType(self.__dataclass_fields__,coerce=self.typeCoercion)
+            self.checkType(fields,coerce=self.typeCoercion)
+        if self.optionEnforce:
+            self.checkOptions(fields)
 
-    def checkType2(self,coerce=False):
-        attrs = {key:{'type':value.type,'value':getattr(self,key,None)} for key,value in self.__dataclass_fields__.items() if key not in baseDataClass.__dataclass_fields__.keys()}
-        for name,item in attrs.items():
-            passConditions = (
-                item['value'] is None or
-                (callable(item['type']) and callable(item['value']) or dataclasses.is_dataclass(item['value'])) or
-                isinstance(item['value'],item['type'])
-            )
-            if passConditions:
-                pass
-            else:
-                print(self.typeCoercion,type(self))
-                if self.typeCoercion:
-                    self.coerceType(name,item['type'],item['value'])
-                else:
-                    breakpoint()
-                    self.logError(f'Type enforcement issue: {name}',traceback=True)
+    def checkType(self,fieldValues,coerce=False):
+        # Dump fields to tuple (name,dtype,value,default) for if they fail checks
+        attributes = [
+            (key,value.type,getattr(self,key,None),value.default if value.default is not MISSING else value.default_factory)
+            for key,value in fieldValues.items() if not any(
+                [getattr(self,key,None) is None, # None's pass
+                inspect.isclass(value.type) and isinstance(getattr(self,key,None),value.type), # Matching types pass 
+                value.type is callable and (getattr(self,key,None) is callable or dataclasses.is_dataclass(getattr(self,key,None))) # Callables pass (in some cases)
+                ])]
+        for name,dtype,value,default in attributes:
+            if coerce:
+                self.coerceType(name,dtype,value,default)
+            elif not coerce:
+                self.logError(f'Type check failed: {name} of type {dtype}',traceback=True)
 
-    def coerceType2(self,name,fieldType,fieldValue):
-        # Assign value dict as kwarg if callable
-        if isinstance(fieldType,type(callable)) and isinstance(fieldValue,dict):
-            setattr(self,name,self.__dataclass_fields__[name].default_factory(**fieldValue))
-        # Parse datetimes
-        elif fieldType is datetime:
-            if hasattr(self,'timezone'):
-                kwargs = {'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':True,'TIMEZONE':str(ZoneInfo(getattr(self,'timezone')))}
-            else:
-                kwargs = {'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':False}
-            self.logWarning(f'The datetime object {name}:{fieldValue} will be parsed as with: {kwargs}',hold=True)
-            print(name,fieldValue)
-            setattr(self,name,dateparser.parse(fieldValue,settings=kwargs))
-            self.logWarning(f'Confirm variable coerced correctly: {getattr(self,name)}')
-        # Parse custom spatial objects
-        elif fieldType is spatialObject:
-            setattr(self,name,spatialObject(fieldValue).lat_lon)
-        elif dataclasses.is_dataclass(fieldValue) and hasattr(fieldValue,'to_dict'):
-            setattr(self,name,fieldValue.to_dict())     
-        elif hasattr(fieldType, '__module__') and fieldType.__module__ == 'builtins':
-            self.logWarning(f"\nType mismatch for field: `{name}`\nExpected input of {fieldType.__name__}, received input of {type(fieldValue).__name__}\nAttempting to coerce value: {fieldValue}",hold=True)
-            try:
-                if isinstance(fieldValue,str) and fieldType is list:
-                    setattr(self,name,[fieldType])
-                else:
-                    setattr(self, name,  fieldType(fieldValue))
-                if not isinstance(type(fieldValue),int) and not fieldType is float:
-                    self.logWarning(f'Confirm variable coerced correctly: {fieldValue}')
-            except:
-                self.logError(f"The field `{name}` was assigned by `{type(fieldValue).__name__}` instead of `{fieldType.__name__}` and could not be coerced to required type.")
-        elif dataclasses.is_dataclass(self.__dataclass_fields__[name].default_factory):
-            self.logMessage(f'Parsing nested dataclass: {name}, is this assumption too complicated?')
-            breakpoint()
-            setattr(self,name,self.__dataclass_fields__[name].default_factory(**fieldValue))
-        elif self.verbose:
-            self.logError(f'Coercion failed for {name} \nCannot coerce custom type: {fieldType}')
+    def checkOptions(self,fields):
+        # Dump fields to tuple (name,dtype,value,default) for if they fail checks
+        attributes = [
+            (key,getattr(self,key),value['options']) for key,value in fields.items() if not any(
+                [getattr(self,key) is None, # None's pass
+                'options' not in value.metadata, # Has no options
+                'options' in value.metadata and getattr(self,key) in value.metadata['options'], # Has options which are satisfied
+                ])]
+        if len(attributes) == 0:
+            return
+        for name,value,options in attributes:
+            self.logMessage(f'{name}: {value} is invalid, must be one of {options}')
+        self.logError('Update parameters to meet required options')
 
-
-# @dataclass
-# class baseClass(baseClassMethods):
-#     verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
-#     typeCheck: bool = field(default=False,repr=False)
-#     message: str = field(default='',repr=False)
-#     debug: bool = field(default=False,repr=False)
-#     fromFile: bool = field(default=False,repr=False) # set to true to load from config file (if exists)
-#     configFilePath: str = field(default=None,repr=False)
-#     readOnly: bool = field(default=True,repr=False) # Only write config if readOnly == False or configFileExists=False
-#     temporaryWritePermission: bool = field(default=False,repr=False) # Overwrite readOnly for one operation
-
-
-#     def __post_init__(self):
-#         if type(self).__name__ != 'baseClass':
-#             if self.fromFile and self.configFilePath is not None:
-#                 if os.path.exists(self.configFilePath):
-#                     self.loadFromConfigFile()
-#             if self.debug:
-#                 self.logMessage(f"Running: {type(self)}")
-#             if self.typeCheck:
-#                 self.inspectFields()
-                
-
-#     def inspectFields(self):
-#         self.logMessage(f'type-checking inputs: {type(self).__name__}')
-#         for (name, field) in self.__dataclass_fields__.items():
-#             value = getattr(self, name, None)
-#             self.typeEnforcement(name,value,field)
-#             self.checkMetadata(name,value,field)
-            
-#     def typeEnforcement(self,name,value,field):
-#         field_type = field.type
-#         if isinstance(field_type,type(callable)):
-#             if isinstance(value,dict):
-#                 setattr(self,name,field.default_factory(**value))
-#         if not isinstance(field_type,type(callable)) and not isinstance(value, field_type) and value is not None:
-#             current_type = type(value)
-#             if field_type is datetime:
-#                 if hasattr(self,'timezone'):
-#                     kwargs = {'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':True,'TIMEZONE':str(ZoneInfo(self.timezone))}
-#                 else:
-#                     kwargs = {'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':False}
-#                 self.logWarning(f'The datetime object {name}:{value} will be parsed as with: {kwargs}',hold=True)
-#                 setattr(self,name,dateparser.parse(value,settings=kwargs))
-#                 self.logWarning(f'Confirm variable coerced correctly: {getattr(self,name)}')
-#             elif field_type is spatialObject:
-#                 setattr(self,name,spatialObject(value).lat_lon)
-#             elif dataclasses.is_dataclass(value) and hasattr(value,'to_dict'):
-#                 setattr(self,name,value.to_dict())     
-#             elif hasattr(field_type, '__module__') and field_type.__module__ == 'builtins':
-#                 self.logWarning(f"\nType mismatch for field: `{name}`\nExpected input of {field_type.__name__}, received input of {current_type.__name__}\nAttempting to coerce value: {value}",hold=True)
-#                 try:
-#                     if isinstance(value,str) and field_type is list:
-#                         setattr(self,name,[value])
-#                     else:
-#                         setattr(self, name,  field_type(value))
-#                     if not isinstance(current_type,int) and not field_type is float:
-#                         self.logWarning(f'Confirm variable coerced correctly: {value}')
-#                 except:
-#                     self.logError(f"The field `{name}` was assigned by `{current_type.__name__}` instead of `{field_type.__name__}` and could not be coerced to required type.")
-#             elif dataclasses.is_dataclass(self.__dataclass_fields__[name].default_factory):
-#                 self.logMessage(f'Parsing nested dataclass: {name}, is this assumption too complicated?')
-#                 breakpoint()
-#                 setattr(self,name,self.__dataclass_fields__[name].default_factory(**value))
-#             elif self.verbose:
-#                 self.logError(f'Coercion failed for {name} \nCannot coerce custom type: {field_type}')
-    
-    def checkOptions(self,name,value,field):
-        if 'options' in field.metadata:
-            if isinstance(field.metadata['options'],Iterable):
-                if value in field.metadata['options']:
-                    pass
-                elif field.type is str and value not in field.metadata['options'] and value is not None:
-                    self.logWarning(msg=f"{value} is not valid")
-                    breakpoint()
-                    self.logError(msg=f'{name} must be one of {field.metadata["options"]}')
-
-                elif value is not None:
-                    self.logWarning('Options currently only enabled for string types')
-                    if self.logChoice('Proceed with interactive debug session'):
-                        breakpoint()
-            else:
-                if value != field.metadata['options']:
-                    self.logError(msg=f'{name} must be {field.metadata["options"]}')
-
-    def loadFromConfigFile(self):
-        defaultOverwrites = [
-            'dateModified'
-        ]
-        self.logMessage(f"Reading: {self.configFilePath}")
-        tmp,self.header = self.loadDict(fileName=self.configFilePath,returnHeader=True)
-        for key,value in tmp.items():
-            # Overwrite defaults
-            if key not in self.__dataclass_fields__.keys():
-                self.logError(f'Does not accept generic undefined parameters,\n {key} field must be added to source code')
-                breakpoint()
-            elif key in defaultOverwrites:
-                setattr(self,key,value)
-            elif key not in self.__dict__.keys():
-                setattr(self,key,value)
-            elif value != self.__dict__[key]:
-                if (self.__dataclass_fields__[key].default == self.__dict__[key] or 
-                    (self.__dataclass_fields__[key].default_factory is not MISSING and self.__dataclass_fields__[key].default_factory() == self.__dict__[key])):
-                    setattr(self,key,value)
-                else:
-                    if self.readOnly:
-                        self.logWarning('Cannot over-write yaml configurations with field inputs when running with readOnly = True')
-                    else:
-                        self.logWarning(f'Overwriting value in {key}')
-
-        
     def to_dict(self,repr=True,inheritance=True,keepNull=True,sorted=False,onlyID=False,debug=False):
         def factory(data):
             def format(x):
@@ -406,16 +267,6 @@ class baseDataClass(baseFunctions):
         return(data)
 
     def saveConfigFile(self,configFilePath,repr=True,inheritance=True,keepNull=True,sorted=True,debug=False):
-        pass
-        # if self.temporaryWritePermission and self.readOnly:
-        #     self.readOnly = False
-        # else:
-        #     self.temporaryWritePermission = False
-        # if not self.readOnly:
-        #     if not self.configFilePath:
-        #         self.logError('No configFilePath provided')
-        #     else:
-        #         self.logMessage(f"Saving: {self.configFilePath}")
         self.lastModified = self.currentTimeString()
         configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted,debug=debug)
         if hasattr(self,'header') and self.header is not None:
@@ -423,43 +274,3 @@ class baseDataClass(baseFunctions):
         else:
             header=None
         self.saveDict(configDict,fileName=configFilePath,header=header)
-        #     if self.temporaryWritePermission:
-        #         self.readOnly = True
-        #         self.temporaryWritePermission = False
-        # else:
-        #     self.logMessage(f'readOnly={self.readOnly}, not saving {self.configFilePath}')
-
-    # def logError(self,msg='',traceback=True,kill=True,verbose=None):
-    #     if verbose is None:
-    #         verbose = self.verbose
-    #     out = log(msg=f'\n\n{"*"*11} Error {"*"*11}\n{msg}\n{"*"*10} Exiting {"*"*10}\n',traceback=traceback,kill=kill,cf=currentframe(),verbose=verbose)
-
-    # def logWarning(self,msg='',hold=False,traceback=False,verbose=None):
-    #     if verbose is None:
-    #         verbose = self.verbose
-    #     if not hasattr(self,'message') or self.message == '':
-    #         self.message = msg
-    #     else:
-    #         self.message = '\n'.join([self.message, msg])
-    #     if not hold:
-    #         out = log(msg=f'{"*"*10} Warning {"*"*10}\n{self.message}\n',traceback=traceback,cf=currentframe(),verbose=verbose)
-    #         self.message = ''
-
-    # def logChoice(self,msg,proceed='Y',kill=False):
-    #     out = log(msg=msg,cf=currentframe(),verbose=True)
-    #     i = input(f'Enter {proceed} to continue or any other key to exit: ')
-    #     if i == proceed:
-    #         return (True)
-    #     elif kill:
-    #         log(msg='Exiting',kill=kill)
-    #     else:
-    #         return (False)
-
-    # def logMessage(self,msg,verbose=None,traceback=False):
-    #     if verbose is None:
-    #         verbose = self.verbose
-    #     out = log(f"{msg}",traceback=traceback,verbose=verbose,cf=currentframe())
-
-    # def currentTimeString(self=None,fmt='%Y-%m-%dT%H:%M:%SZ'):
-    #     return(datetime.now(timezone.utc).strftime(fmt))
-    
