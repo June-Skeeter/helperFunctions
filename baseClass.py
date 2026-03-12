@@ -246,6 +246,8 @@ class baseDataClass(baseFunctions):
                     return(x.isoformat())
                 elif callable(x):
                     return(x.__name__)
+                # elif dataclasses.is_dataclass(x):
+                #     breakpoint()
                 else:
                     return(x)
             return({
