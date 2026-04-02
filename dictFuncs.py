@@ -59,7 +59,6 @@ class dictFuncs:
         return(finalOutput)
 
     def dcToDict(self,dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1,sorted=False):
-        print('This method is depreciated!')
         fields = dc.__dataclass_fields__
         # Keys of child class
         if inheritance:
@@ -79,40 +78,22 @@ class dictFuncs:
             (keepNull or not optional[k] or getattr(dc, k) is not None) and # Apply null filter if applicable
             (fields[k].repr or not repr) # Apply repr filter if applicable
         }
+        # Recursively format out nested dataclasses
+        cleanOutput = {
+            key:self.rCheck(value,repr,inheritance,keepNull,majorOrder,minorOrder,sorted) for key,value  in cleanOutput.items()
+        }
         if sorted:
-            keyList = list(cleanOutput.keys())
-            if sorted == 'default':
-                keyList.sort()
-            elif sorted == 'ignoreCase':
-                keyList.sort(key=lambda v: v.upper())
-            else:
-                keyList.sort(key=lambda v: v.upper())
-                if hasattr(type(dc),'requiredArgs'):
-                    ra = [r for r in type(dc).requiredArgs() if dc.__dataclass_fields__[r].repr]
-                    ra.sort(key=lambda v: v.upper())
-                    if len(ra) > 0:
-                        keyList = ra + [k for k in keyList if k not in ra]
-            sortedOutput = {key:cleanOutput[key] for key in keyList}
-            cleanOutput = sortedOutput
-        # Move iterables to back (lists then dicts) to increase readability of yaml files
-        toBack = {}
-        toMiddle = {}
-        toFront = {}
-        for key,value in cleanOutput.items():
-            if is_dataclass(value):
-                if hasattr(value,'to_dict'):
-                    value = self.dcToDict(value,repr,inheritance,keepNull,majorOrder,minorOrder,sorted)
-                else:
-                    log(f'**Warning**:\n{key} is a dataclass, this can lead to serialization errors')
-            if type(value) is not str and isinstance(value,Iterable):
-                if isinstance(value,list):
-                    toMiddle[key] = value
-                else:
-                    toBack[key] = value
-            else:
-                toFront[key] = value
-        finalOutput = toFront | toMiddle | toBack
-        return finalOutput
+            cleanOutput = self.sortDict(cleanOutput)
+        return cleanOutput
+    
+    def rCheck(self,value,repr,inheritance,keepNull,majorOrder,minorOrder,sorted):
+        if is_dataclass(value):
+            value = self.dcToDict(value,repr,inheritance,keepNull,majorOrder,minorOrder,sorted)
+        elif isinstance(value,dict):
+            for key in value.keys():
+                value[key] = self.rCheck(value[key],repr,inheritance,keepNull,majorOrder,minorOrder,sorted)
+        return value
+
 
 
 

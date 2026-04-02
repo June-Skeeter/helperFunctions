@@ -2,7 +2,7 @@ import os
 import inspect
 import dataclasses
 from types import MappingProxyType
-from dataclasses import dataclass, field, MISSING, make_dataclass, asdict
+from dataclasses import dataclass, field, MISSING, make_dataclass
 from .parseCoordinates import parseCoordinates
 from typing import Iterable, Callable
 from .dictFuncs import dictFuncs
@@ -240,32 +240,10 @@ class baseDataClass(baseFunctions):
         self.logError('Update parameters to meet required options')
 
     def to_dict(self,repr=True,inheritance=True,keepNull=True,sorted=False,onlyID=False,debug=False):
-        def factory(data):
-            def format(x):
-                if hasattr(x,'isoformat'):
-                    return(x.isoformat())
-                elif callable(x):
-                    return(x.__name__)
-                # elif dataclasses.is_dataclass(x):
-                #     breakpoint()
-                else:
-                    return(x)
-            return({
-                key:format(value) for key,value in data
-                if (keepNull or value is not None)
-            })
-        data = asdict(self,dict_factory=factory)
-        if inheritance == False:
-            annotationKeys = self.__annotations__.keys()
         if onlyID == True:
-            data = {key:data[key] for key in self.requiredArgs()}
-            repr = None
-        if repr is not None:
-            for key,value in self.__dataclass_fields__.items():
-                if key in data:
-                    if value.repr != repr or (inheritance == False and key not in annotationKeys):
-                        data.pop(key)
-        data = self.sortDict(data,sorted=sorted)
+            data = {key:self.__dict__[key] for key in self.requiredArgs()} 
+        else:
+            data = dictFuncs().dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted)
         return(data)
 
     def saveConfigFile(self,configFilePath,repr=True,inheritance=True,keepNull=True,sorted=True,debug=False):
@@ -275,4 +253,7 @@ class baseDataClass(baseFunctions):
             header=self.header
         else:
             header=None
-        self.saveDict(configDict,fileName=configFilePath,header=header)
+        try:
+            self.saveDict(configDict,fileName=configFilePath,header=header)
+        except:
+            breakpoint()
