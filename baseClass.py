@@ -66,6 +66,8 @@ class baseClassMethods(dictFuncs):
         
     @classmethod
     def from_yaml(cls,fpath,kwargs={},kwargOverwrite=False):
+        if kwargs['debug']:
+            breakpoint()
         if kwargOverwrite:
             env = cls.loadDict(None,fileName=fpath)|kwargs
         else:
@@ -201,7 +203,8 @@ class baseDataClass(baseFunctions):
     verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
     typeEnforce: bool = field(default=True,repr=False) # Enable type enforcement
     typeCoercion: bool = field(default=True,repr=False) # Enable type coercion if fails type check
-    optionEnforce: bool = field(default=True,repr=False)
+    optionEnforce: bool = field(default=True,repr=False) #
+    debug: bool = field(default=False) # Allows embedding of conditional debug statements
 
     def __post_init__(self):
         fields = self.__dataclass_fields__
@@ -217,6 +220,7 @@ class baseDataClass(baseFunctions):
             for key,value in fieldValues.items() if not any(
                 [getattr(self,key,None) is None, # None's pass
                 inspect.isclass(value.type) and isinstance(getattr(self,key,None),value.type), # Matching types pass 
+                value.type is Iterable and isinstance(getattr(self,key,None),Iterable),# Iterables pass
                 value.type is callable and (getattr(self,key,None) is callable or dataclasses.is_dataclass(getattr(self,key,None))) # Callables pass (in some cases)
                 ])]
         for name,dtype,value,default in attributes:
