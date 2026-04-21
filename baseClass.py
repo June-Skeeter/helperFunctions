@@ -232,7 +232,7 @@ class baseDataClass(baseFunctions):
     def checkOptions(self,fields):
         # Dump fields to tuple (name,dtype,value,default) for if they fail checks
         attributes = [
-            (key,getattr(self,key),value['options']) for key,value in fields.items() if not any(
+            (key,getattr(self,key),value.metadata['options']) for key,value in fields.items() if not any(
                 [getattr(self,key) is None, # None's pass
                 'options' not in value.metadata, # Has no options
                 'options' in value.metadata and getattr(self,key) in value.metadata['options'], # Has options which are satisfied
@@ -240,8 +240,8 @@ class baseDataClass(baseFunctions):
         if len(attributes) == 0:
             return
         for name,value,options in attributes:
-            self.logMessage(f'{name}: {value} is invalid, must be one of {options}')
-        self.logError('Update parameters to meet required options')
+            # self.logMessage(f'{name}: {value} is invalid, must be one of {options}')
+            self.logError(f'Update parameters to meet required options:\n{name}: {value} is invalid, must be one of {options}')
 
     def to_dict(self,repr=True,inheritance=True,keepNull=True,sorted=False,onlyID=False,debug=False):
         if onlyID == True:
