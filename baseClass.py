@@ -1,4 +1,5 @@
 import os
+import sys
 import inspect
 import dataclasses
 from types import MappingProxyType
@@ -15,6 +16,9 @@ from .log import log
 from ruamel.yaml.comments import CommentedMap
 from zoneinfo import ZoneInfo
 
+
+platform = sys.platform
+isWindows = platform in ['win32','cygwin','msys']
 
 # ruamel = YAML()
 # @dataclass
@@ -134,6 +138,13 @@ class baseClassMethods(dictFuncs):
 
 class baseFunctions(baseClassMethods):
     
+    def normpath(self,path):
+        if isWindows:
+            return os.path.normpath(path)
+        else:
+            return os.path.normpath(path).replace('\\','/')
+
+
     def logError(self,msg='',traceback=True,kill=True,verbose=None):
         if verbose is None:
             verbose = self.verbose
