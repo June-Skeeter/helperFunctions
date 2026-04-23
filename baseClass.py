@@ -15,7 +15,6 @@ from .log import log
 from ruamel.yaml.comments import CommentedMap
 from zoneinfo import ZoneInfo
 
-
 # ruamel = YAML()
 # @dataclass
 class spatialObject:
@@ -134,6 +133,12 @@ class baseClassMethods(dictFuncs):
 
 class baseFunctions(baseClassMethods):
     
+    def normpath(self,path):
+        if os.name == 'nt':
+            return os.path.normpath(path)
+        else:
+            return os.path.normpath(path).replace('\\','/')
+
     def logError(self,msg='',traceback=True,kill=True,verbose=None):
         if verbose is None:
             verbose = self.verbose
@@ -172,6 +177,8 @@ class baseFunctions(baseClassMethods):
         # Simple cases
         if dtype in [bool,str,int,float]:
             setattr(self,name,dtype(value))
+        elif dtype is list:
+            setattr(self,name,[value])
         # Custom for datetimes
         elif dtype is datetime:
             self.parseDatetime(name,value)
