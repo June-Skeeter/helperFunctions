@@ -173,6 +173,44 @@ class baseFunctions(baseClassMethods):
     def currentTimeString(self=None,fmt='%Y-%m-%dT%H:%M:%SZ'):
         return(datetime.now(timezone.utc).strftime(fmt))
     
+    def parseDatetime(self,name,value):
+        if hasattr(self,'timezone'):
+            kwargs = {'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':True,'TIMEZONE':str(ZoneInfo(getattr(self,'timezone')))}
+        else:
+            kwargs = {'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':False}
+        self.logWarning(f'The datetime object {name}:{value} will be parsed as with: {kwargs}',hold=True)
+        setattr(self,name,dateparser.parse(value,settings=kwargs))
+        self.logWarning(f'Confirm variable coerced correctly: {getattr(self,name)}')
+
+
+mdMap = baseClassMethods.metadataMap
+
+@dataclass
+class typeEnforcer(baseFunctions):
+    typeEnforce: bool = field(default=True,repr=False) # Enable type enforcement
+    typeCoercion: bool = field(default=False,repr=False) # Attempt to force types
+
+    def __post_init__(self):
+        if self.typeEnforce:
+            self.checkType()
+
+    def checkType(self):
+        fieldValues = self.__dataclass_fields__
+        # Dump fields to tuple (name,dtype,value,default) for if they fail checks
+        attributes = [
+            (key,value.type,getattr(self,key,None),value.default if value.default is not MISSING else value.default_factory)
+            for key,value in fieldValues.items() if not any(
+                [getattr(self,key,None) is None, # None's pass
+                inspect.isclass(value.type) and isinstance(getattr(self,key,None),value.type), # Matching types pass 
+                value.type is Iterable and isinstance(getattr(self,key,None),Iterable),# Iterables pass
+                value.type is callable and (getattr(self,key,None) is callable or dataclasses.is_dataclass(getattr(self,key,None))) # Callables pass (in some cases)
+                ])]
+        for name,dtype,value,default in attributes:
+            if self.typeCoercion:
+                self.coerceType(name,dtype,value,default)
+            elif not self.typeCoercion:
+                self.logError(f'Type check failed: {name} of type {dtype}',traceback=True)
+                
     def coerceType(self,name,dtype,value,default=None):
         # Simple cases
         if dtype in [bool,str,int,float]:
@@ -191,52 +229,22 @@ class baseFunctions(baseClassMethods):
         else:
             self.logMessage(f'More complex type, add method to handle: {name, dtype,value}')
             breakpoint()
-
-    def parseDatetime(self,name,value):
-        if hasattr(self,'timezone'):
-            kwargs = {'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':True,'TIMEZONE':str(ZoneInfo(getattr(self,'timezone')))}
-        else:
-            kwargs = {'DATE_ORDER':'YMD','RETURN_AS_TIMEZONE_AWARE':False}
-        self.logWarning(f'The datetime object {name}:{value} will be parsed as with: {kwargs}',hold=True)
-        setattr(self,name,dateparser.parse(value,settings=kwargs))
-        self.logWarning(f'Confirm variable coerced correctly: {getattr(self,name)}')
-
-
-mdMap = baseClassMethods.metadataMap
-
 @dataclass
-class baseDataClass(baseFunctions):
+class baseDataClass(typeEnforcer):
     # verbose: bool = False
     verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
-    typeEnforce: bool = field(default=True,repr=False) # Enable type enforcement
     typeCoercion: bool = field(default=True,repr=False) # Enable type coercion if fails type check
     optionEnforce: bool = field(default=True,repr=False) #
     debug: bool = field(default=False) # Allows embedding of conditional debug statements
 
     def __post_init__(self):
-        fields = self.__dataclass_fields__
-        if self.typeEnforce:
-            self.checkType(fields,coerce=self.typeCoercion)
         if self.optionEnforce:
-            self.checkOptions(fields)
+            self.checkOptions()
+        super().__post_init__()
 
-    def checkType(self,fieldValues,coerce=False):
-        # Dump fields to tuple (name,dtype,value,default) for if they fail checks
-        attributes = [
-            (key,value.type,getattr(self,key,None),value.default if value.default is not MISSING else value.default_factory)
-            for key,value in fieldValues.items() if not any(
-                [getattr(self,key,None) is None, # None's pass
-                inspect.isclass(value.type) and isinstance(getattr(self,key,None),value.type), # Matching types pass 
-                value.type is Iterable and isinstance(getattr(self,key,None),Iterable),# Iterables pass
-                value.type is callable and (getattr(self,key,None) is callable or dataclasses.is_dataclass(getattr(self,key,None))) # Callables pass (in some cases)
-                ])]
-        for name,dtype,value,default in attributes:
-            if coerce:
-                self.coerceType(name,dtype,value,default)
-            elif not coerce:
-                self.logError(f'Type check failed: {name} of type {dtype}',traceback=True)
 
-    def checkOptions(self,fields):
+    def checkOptions(self):
+        fields = self.__dataclass_fields__
         # Dump fields to tuple (name,dtype,value,default) for if they fail checks
         attributes = [
             (key,getattr(self,key),value.metadata['options']) for key,value in fields.items() if not any(
