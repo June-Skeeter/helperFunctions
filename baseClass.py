@@ -16,13 +16,6 @@ from .log import log
 from ruamel.yaml.comments import CommentedMap
 from zoneinfo import ZoneInfo
 
-<<<<<<< HEAD
-
-platform = sys.platform
-isWindows = platform in ['win32','cygwin','msys']
-
-=======
->>>>>>> U
 # ruamel = YAML()
 # @dataclass
 class spatialObject:
@@ -142,19 +135,11 @@ class baseClassMethods(dictFuncs):
 class baseFunctions(baseClassMethods):
     
     def normpath(self,path):
-<<<<<<< HEAD
-        if isWindows:
-=======
         if os.name == 'nt':
->>>>>>> U
             return os.path.normpath(path)
         else:
             return os.path.normpath(path).replace('\\','/')
 
-<<<<<<< HEAD
-
-=======
->>>>>>> U
     def logError(self,msg='',traceback=True,kill=True,verbose=None):
         if verbose is None and hasattr(self,'verbose'):
             verbose = self.verbose
