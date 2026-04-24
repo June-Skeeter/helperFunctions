@@ -58,7 +58,8 @@ class dictFuncs:
         finalOutput = toFront | toMiddle | toBack
         return(finalOutput)
 
-    def dcToDict(self,dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1,sorted=False):
+    def dcToDict(self,dc,repr=True,inheritance=True,keepNull=True,majorOrder=1,minorOrder=1,sorted=False,debug=False):
+        # dc = copy.deepcopy(dc_in)
         fields = dc.__dataclass_fields__
         # Keys of child class
         if inheritance:
@@ -88,11 +89,14 @@ class dictFuncs:
     
     def rCheck(self,value,repr,inheritance,keepNull,majorOrder,minorOrder,sorted):
         if is_dataclass(value):
-            value = self.dcToDict(value,repr,inheritance,keepNull,majorOrder,minorOrder,sorted)
+            vcopy = self.dcToDict(value,repr,inheritance,keepNull,majorOrder,minorOrder,sorted)
         elif isinstance(value,dict):
+            vcopy = {}
             for key in value.keys():
-                value[key] = self.rCheck(value[key],repr,inheritance,keepNull,majorOrder,minorOrder,sorted)
-        return value
+                vcopy[key] = self.rCheck(value[key],repr,inheritance,keepNull,majorOrder,minorOrder,sorted)
+        else:
+            vcopy = value
+        return vcopy
 
 
 
