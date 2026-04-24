@@ -140,13 +140,17 @@ class baseFunctions(baseClassMethods):
             return os.path.normpath(path).replace('\\','/')
 
     def logError(self,msg='',traceback=True,kill=True,verbose=None):
-        if verbose is None:
+        if verbose is None and hasattr(self,'verbose'):
             verbose = self.verbose
+        else:
+            verbose = True
         out = log(msg=f'\n\n{"*"*11} Error {"*"*11}\n{msg}\n{"*"*10} Exiting {"*"*10}\n',traceback=traceback,kill=kill,cf=currentframe(),verbose=verbose)
 
     def logWarning(self,msg='',hold=False,traceback=False,verbose=None):
-        if verbose is None:
+        if verbose is None and hasattr(self,'verbose'):
             verbose = self.verbose
+        else:
+            verbose = True
         if not hasattr(self,'message') or self.message == '':
             self.message = msg
         else:
@@ -166,8 +170,10 @@ class baseFunctions(baseClassMethods):
             return (False)
 
     def logMessage(self,msg,verbose=None,traceback=False):
-        if verbose is None:
+        if verbose is None and hasattr(self,'verbose'):
             verbose = self.verbose
+        else:
+            verbose = True
         out = log(f"{msg}",traceback=traceback,verbose=verbose,cf=currentframe())
 
     def currentTimeString(self=None,fmt='%Y-%m-%dT%H:%M:%SZ'):
@@ -183,19 +189,20 @@ class baseFunctions(baseClassMethods):
         self.logWarning(f'Confirm variable coerced correctly: {getattr(self,name)}')
 
 
-mdMap = baseClassMethods.metadataMap
-
+# Dataclass with no fields for automatic type enforcement (with simple coercsion by default)
 @dataclass
 class typeEnforcer(baseFunctions):
-    typeEnforce: bool = field(default=True,repr=False) # Enable type enforcement
-    typeCoercion: bool = field(default=False,repr=False) # Attempt to force types
 
     def __post_init__(self):
-        if self.typeEnforce:
+        if not hasattr(self,'typeEnforce'):
             self.checkType()
 
     def checkType(self):
         fieldValues = self.__dataclass_fields__
+        if hasattr(self,'typeCoercion') and self.typeCoercion:
+            coerceMethod = 'full'
+        else:
+            coerceMethod = 'simple'
         # Dump fields to tuple (name,dtype,value,default) for if they fail checks
         attributes = [
             (key,value.type,getattr(self,key,None),value.default if value.default is not MISSING else value.default_factory)
@@ -206,38 +213,43 @@ class typeEnforcer(baseFunctions):
                 value.type is callable and (getattr(self,key,None) is callable or dataclasses.is_dataclass(getattr(self,key,None))) # Callables pass (in some cases)
                 ])]
         for name,dtype,value,default in attributes:
-            if self.typeCoercion:
-                self.coerceType(name,dtype,value,default)
-            elif not self.typeCoercion:
-                self.logError(f'Type check failed: {name} of type {dtype}',traceback=True)
+            self.coerceType(coerceMethod,name,dtype,value,default)
                 
-    def coerceType(self,name,dtype,value,default=None):
+    def coerceType(self,coerceMethod,name,dtype,value,default=None):
         # Simple cases
         if dtype in [bool,str,int,float]:
             setattr(self,name,dtype(value))
-        elif dtype is list:
-            setattr(self,name,[value])
         # Custom for datetimes
         elif dtype is datetime:
             self.parseDatetime(name,value)
-        # Custom spatial data
-        elif dtype is spatialObject:
-            setattr(self,name,spatialObject(value).lat_lon)
-        # Custom for nested dataclasses with dict inputs
-        elif dataclasses.is_dataclass(default) and isinstance(value,dict):
-            setattr(self,name,default(**value))
+        elif coerceMethod == 'full':
+            if dtype is list:
+                setattr(self,name,[value])
+            # Custom spatial data
+            elif dtype is spatialObject:
+                setattr(self,name,spatialObject(value).lat_lon)
+            # Custom for nested dataclasses with dict inputs
+            elif dataclasses.is_dataclass(default) and isinstance(value,dict):
+                setattr(self,name,default(**value))
+            else:
+                self.logMessage(f'More complex type, add method to handle: {name, dtype,value}')
+                breakpoint()
         else:
-            self.logMessage(f'More complex type, add method to handle: {name, dtype,value}')
-            breakpoint()
+            self.logError(f'Type check failed in {type(self)}: {name} of type {dtype}',traceback=True)
+
+mdMap = baseClassMethods.metadataMap
+
 @dataclass
 class baseDataClass(typeEnforcer):
-    # verbose: bool = False
     verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
-    typeCoercion: bool = field(default=True,repr=False) # Enable type coercion if fails type check
+    typeEnforce: bool = field(default=True,repr=False) # Enable type enforcement
+    typeCoercion: str = field(default=True,repr=False) # Enable type coercion if fails type check
     optionEnforce: bool = field(default=True,repr=False) #
-    debug: bool = field(default=False) # Allows embedding of conditional debug statements
+    debug: bool = field(default=False,repr=False) # Allows embedding of conditional debug statements
 
     def __post_init__(self):
+        if self.typeEnforce:
+            self.checkType()
         if self.optionEnforce:
             self.checkOptions()
         super().__post_init__()
@@ -262,7 +274,7 @@ class baseDataClass(typeEnforcer):
         if onlyID == True:
             data = {key:self.__dict__[key] for key in self.requiredArgs()} 
         else:
-            data = dictFuncs().dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted)
+            data = dictFuncs().dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted,debug=debug)
         return(data)
 
     def saveConfigFile(self,configFilePath,repr=True,inheritance=True,keepNull=True,sorted=True,debug=False):
