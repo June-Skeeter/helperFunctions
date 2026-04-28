@@ -13,6 +13,8 @@ from ruamel.yaml import YAML
 
 from dataclasses import is_dataclass
 
+from ruamel.yaml.scalarstring import walk_tree
+
 yaml = YAML()
 
 
@@ -134,7 +136,7 @@ class dictFuncs:
 
     # Save a dictionary to json or yaml format
     # Preserve yaml header if desired
-    def saveDict(self,obj,fileName,header=None,sort_keys=False,indent=None,anchors=False):
+    def saveDict(self,obj,fileName,header=None,sort_keys=False,indent=None,anchors=False,stringLiterals=True):
         if os.path.split(fileName)[0] == '':
             pass
         elif not os.path.isdir(os.path.split(fileName)[0]):
@@ -145,6 +147,8 @@ class dictFuncs:
                 if header:
                     header = '\n'.join([h if h.startswith('#') else '# '+h for h in header.split('\n')])
                     file.write(header+ymlStartMarker)
+                if stringLiterals:
+                    walk_tree(obj)
                 if anchors:
                     yaml.dump(obj,file)
                 else:
