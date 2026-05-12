@@ -7,7 +7,7 @@ def parseFrequency(text):
         if match:
             s = s[match.start():]
         return s 
-    freqDict = {'MSEC':'ms','Usec':'us','Sec':'s','HR':'h','MIN':'min'}
+    freqDict = {'MSEC':'ms','Usec':'us','Sec':'s','HR':'h','MIN':'min','T':'min'}
     freq = split_digit(text)
     for key,value in freqDict.items():
         freq = re.sub(key.lower(), value, freq, flags=re.IGNORECASE)

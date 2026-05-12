@@ -12,12 +12,9 @@ import dateparser
 from inspect import currentframe
 from .log import log
 
-# from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 from zoneinfo import ZoneInfo
 
-# ruamel = YAML()
-# @dataclass
 class spatialObject:
 
     def __init__(self,lat_lon):

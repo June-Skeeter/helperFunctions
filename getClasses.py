@@ -1,6 +1,5 @@
 import inspect
 
-
 # Given a module, get the names of all classes defined within the module
 def getClasses(module):
     classes = []
