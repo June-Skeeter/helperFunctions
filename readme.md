@@ -2,6 +2,12 @@
 
 A collection of helpful tools for data processing, best used as a submodule in other applications.
 
+* baseClass.py: a set of template classes/dataclasses which can be inherited by other objects, containing some default behaviour like type checking and loading dataclasses from yaml files
+* parseCoordinates.py: auto-parse lat/lon in various string formats to decimal degrees
+* dictFuncs.py: read, write, sort, update, modify nesting level of dictionaries
+* cmdParse.py: convert command line args to dictionaries for calling functions/classes
+
+
 ## Adding a submodule
 
 Command line syntax for adding a submodule:
