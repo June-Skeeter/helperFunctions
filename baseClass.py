@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import dateparser
 from inspect import currentframe
 from .log import log
+from .cmdParse import cmdParse
 
 from ruamel.yaml.comments import CommentedMap
 from zoneinfo import ZoneInfo
@@ -42,6 +43,27 @@ class spatialObject:
 # * Supports type checking
 # * Reading and writing from yaml files (with type checking)
 class baseClassMethods(dictFuncs):
+
+    @classmethod
+    def defaults(cls):
+        if dataclasses.is_dataclass(cls):
+            defaults = {key:value.default for key,value in cls.__dataclass_fields__.items() if value.default is not MISSING and value.init} 
+            factories = {key:value.default_factory() for key,value in cls.__dataclass_fields__.items() if value.default_factory is not MISSING and value.init} 
+            missing = {key:'MISSINGREQUIREDKWARG' for key,value in cls.__dataclass_fields__.items() if value.default is MISSING and value.default_factory is MISSING and value.init} 
+            return defaults | factories | missing
+        else:
+            return None
+        
+    @classmethod
+    def from_cmd(cls):
+        kwargs = cls.defaults()
+        kwargs = cmdParse(kwargs)
+        if any([k for k,v in kwargs.items() if v == 'MISSINGREQUIREDKWARG']):
+            log(f'Missing required arguments: {'; '.join([k for k,v in kwargs.items() if v == 'MISSINGREQUIREDKWARG'])}')
+            exit()
+        return(cls.from_dict(kwargs))
+
+    
 
     @classmethod
     def requiredArgs(cls):
@@ -229,6 +251,8 @@ class typeEnforcer(baseFunctions):
             # Custom for nested dataclasses with dict inputs
             elif dataclasses.is_dataclass(default) and isinstance(value,dict):
                 setattr(self,name,default(**value))
+            # elif value is dtype:
+            #     setattr(self,name,value())
             else:
                 self.logMessage(f'More complex type, add method to handle: {name, dtype,value}')
                 breakpoint()

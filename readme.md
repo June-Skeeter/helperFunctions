@@ -26,6 +26,7 @@ To update a local copy repo and its submodules from remote
 To make, commit, and push changes to a submodule made from within a parent repo
 
 `cd path/to/submodule`
+
 `git checkout -b submodUpdates`
 
 Make whatever changes then commit.  It is important to create a new branch, because submodules heads are often detached from the main branch.
@@ -35,12 +36,16 @@ Make whatever changes then commit.  It is important to create a new branch, beca
 Merge back to main then delete the updates branch
 
 `git checkout main`
+
 `git merge submodUpdates`
+
 `git branch -D submodUpdates`
 
 Navigate back to the base of the "parent" module.  Commit changes to the submodule (plus any changes within the module its self), then push to remote.
 
 `cd ../../..`
+
 `git commit -am "updated submodule"`
+
 `git push --recurse-submodules=on-demand`
 
