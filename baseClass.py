@@ -55,13 +55,23 @@ class baseClassMethods(dictFuncs):
             return None
         
     @classmethod
-    def from_cmd(cls):
+    def from_cmd(cls,safeMode=True):
         kwargs = cls.defaults()
-        kwargs = cmdParse(kwargs)
+        if safeMode:
+            kwargs = cmdParse(kwargs)
+            auxargs = {}
+        else:
+            kwargs,auxargs = cmdParse(kwargs,safeMode=safeMode)
         if any([k for k,v in kwargs.items() if v == 'MISSINGREQUIREDKWARG']):
             log(f'Missing required arguments: {'; '.join([k for k,v in kwargs.items() if v == 'MISSINGREQUIREDKWARG'])}')
             exit()
-        return(cls.from_dict(kwargs))
+        if 'configFile' not in kwargs or kwargs['configFile'] is None:
+            kwargs = kwargs | auxargs
+            return(cls.from_dict(kwargs))
+        else:
+            config = kwargs.pop('configFile')
+            kwargs = kwargs | auxargs
+            return(cls.from_yaml(fpath=config,kwargs=kwargs))
 
     
 
@@ -259,7 +269,6 @@ class typeEnforcer(baseFunctions):
         else:
             self.logError(f'Type check failed in {type(self)}: {name} of type {dtype}',traceback=True)
 
-mdMap = baseClassMethods.metadataMap
 
 @dataclass
 class baseDataClass(typeEnforcer):
@@ -268,6 +277,7 @@ class baseDataClass(typeEnforcer):
     typeCoercion: str = field(default=True,repr=False) # Enable type coercion if fails type check
     optionEnforce: bool = field(default=True,repr=False) #
     debug: bool = field(default=False,repr=False) # Allows embedding of conditional debug statements
+    configFile: dict = field(default=None,repr=False)
 
     def __post_init__(self):
         if self.typeEnforce:
@@ -310,3 +320,6 @@ class baseDataClass(typeEnforcer):
             self.saveDict(configDict,fileName=configFilePath,header=header)
         except:
             breakpoint()
+
+
+mdMap = baseClassMethods.metadataMap

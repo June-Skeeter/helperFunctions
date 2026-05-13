@@ -12,9 +12,11 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
     
-def cmdParse(defaultArgs,debug=False):
+def cmdParse(defaultArgs,debug=False,safeMode=True):
     # helper function to parse command line arguments
     CLI=argparse.ArgumentParser()
+    
+
     dictArgs = []
     for key,val in defaultArgs.items():
         dt = type(val)
@@ -34,12 +36,21 @@ def cmdParse(defaultArgs,debug=False):
             dt = str2bool
         CLI.add_argument(f"--{key}",nargs=nargs,type=dt,default=val)
 
-    # parse the command line
-    args = CLI.parse_args()
-    kwargs = vars(args)
+    # parse arguments
+    known, unknown = CLI.parse_known_args()
+
+    # # parse the command line
+    # args = CLI.parse_args()
+
+    known = vars(known)
+    unknown = {k.lstrip('-'):v for k,v in zip(unknown[::2],unknown[1::2])}
     for d in dictArgs:
-        kwargs[d] = json.loads(kwargs[d])
+        known[d] = json.loads(known[d])
         # replace booleans
     if debug:
-        print(kwargs)
-    return(kwargs)
+        print(known)
+        print(unknown)
+    if safeMode:
+        return(known)
+    else:
+        return(known,unknown)

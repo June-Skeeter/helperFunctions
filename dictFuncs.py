@@ -9,7 +9,6 @@ import copy
 ymlStartMarker = '\n---\n'
 
 from ruamel.yaml import YAML
-# from ruamel.yaml.comments import CommentedMap
 
 from dataclasses import is_dataclass
 
