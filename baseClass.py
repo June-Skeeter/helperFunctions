@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, MISSING, make_dataclass
 from .parseCoordinates import parseCoordinates
 from typing import Iterable, Callable
 from .dictFuncs import dictFuncs
-from datetime import datetime, timezone
+from datetime import datetime, date, timezone
 import dateparser
 from inspect import currentframe
 from .log import log
@@ -62,18 +62,18 @@ class baseClassMethods(dictFuncs):
             auxargs = {}
         else:
             kwargs,auxargs = cmdParse(kwargs,safeMode=safeMode)
-        if any([k for k,v in kwargs.items() if v == 'MISSINGREQUIREDKWARG']):
-            log(f'Missing required arguments: {'; '.join([k for k,v in kwargs.items() if v == 'MISSINGREQUIREDKWARG'])}')
-            exit()
         if 'configFile' not in kwargs or kwargs['configFile'] is None:
-            kwargs = kwargs | auxargs
-            return(cls.from_dict(kwargs))
+            if any([k for k,v in kwargs.items() if v == 'MISSINGREQUIREDKWARG']):
+                log(f'Missing required arguments: {'; '.join([k for k,v in kwargs.items() if v == 'MISSINGREQUIREDKWARG'])}')
+                exit()
+            out = cls.from_dict(kwargs)
+            out.auxargs = auxargs
+            return(out)
         else:
-            config = kwargs.pop('configFile')
-            kwargs = kwargs | auxargs
-            return(cls.from_yaml(fpath=config,kwargs=kwargs))
-
-    
+            # config = kwargs.pop('configFile')
+            out = cls.from_yaml(fpath=kwargs['configFile'],kwargs=kwargs)
+            out.auxargs = auxargs
+            return(out)    
 
     @classmethod
     def requiredArgs(cls):
@@ -251,7 +251,10 @@ class typeEnforcer(baseFunctions):
             setattr(self,name,dtype(value))
         # Custom for datetimes
         elif dtype is datetime:
-            self.parseDatetime(name,value)
+            if isinstance(value,date):
+                setattr(self,name,datetime.fromisoformat(value.isoformat()))
+            else:
+                self.parseDatetime(name,value)
         elif coerceMethod == 'full':
             if dtype is list:
                 setattr(self,name,[value])
@@ -274,21 +277,22 @@ class typeEnforcer(baseFunctions):
 class baseDataClass(typeEnforcer):
     verbose: bool = field(default=True,repr=False) # Enable verbose output for type coercion warnings
     typeEnforce: bool = field(default=True,repr=False) # Enable type enforcement
-    typeCoercion: str = field(default=True,repr=False) # Enable type coercion if fails type check
+    typeCoercion: bool = field(default=True,repr=False) # Enable type coercion if fails type check
     optionEnforce: bool = field(default=True,repr=False) #
     debug: bool = field(default=False,repr=False) # Allows embedding of conditional debug statements
     configFile: dict = field(default=None,repr=False)
 
     def __post_init__(self):
+        if isinstance(self.configFile,str) and os.path.isfile(self.configFile):
+            self.configFile = self.loadDict(self.configFile)
         if self.typeEnforce:
             self.checkType()
         if self.optionEnforce:
             self.checkOptions()
         super().__post_init__()
 
-
     def checkOptions(self):
-        fields = self.__dataclass_fields__
+        fields = {k:v for k,v in self.__dataclass_fields__.items() if v.init}
         # Dump fields to tuple (name,dtype,value,default) for if they fail checks
         attributes = [
             (key,getattr(self,key),value.metadata['options']) for key,value in fields.items() if not any(
