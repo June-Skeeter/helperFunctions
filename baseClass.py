@@ -64,7 +64,7 @@ class baseClassMethods(dictFuncs):
             kwargs,auxargs = cmdParse(kwargs,safeMode=safeMode)
         if 'configFile' not in kwargs or kwargs['configFile'] is None:
             if any([k for k,v in kwargs.items() if v == 'MISSINGREQUIREDKWARG']):
-                log(f'Missing required arguments: {'; '.join([k for k,v in kwargs.items() if v == 'MISSINGREQUIREDKWARG'])}')
+                log(f"Missing required arguments: {'; '.join([k for k,v in kwargs.items() if v == 'MISSINGREQUIREDKWARG'])}")
                 exit()
             out = cls.from_dict(kwargs)
             out.auxargs = auxargs
