@@ -95,8 +95,8 @@ class baseClassMethods(dictFuncs):
         
     @classmethod
     def from_yaml(cls,fpath,kwargs={},kwargOverwrite=False):
-        if kwargs['debug']:
-            breakpoint()
+        # if 'debug' in kwargs and kwargs['debug']:
+        #     breakpoint()
         if kwargOverwrite:
             env = cls.loadDict(None,fileName=fpath)|kwargs
         else:
