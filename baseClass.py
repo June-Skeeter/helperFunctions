@@ -236,12 +236,12 @@ class typeEnforcer(baseFunctions):
         # Dump fields to tuple (name,dtype,value,default) for if they fail checks
         attributes = [
             (key,value.type,getattr(self,key,None),value.default if value.default is not MISSING else value.default_factory)
-            for key,value in fieldValues.items() if not any(
-                [getattr(self,key,None) is None, # None's pass
-                inspect.isclass(value.type) and isinstance(getattr(self,key,None),value.type), # Matching types pass 
-                value.type is Iterable and isinstance(getattr(self,key,None),Iterable),# Iterables pass
+            for key,value in fieldValues.items() if not (
+                getattr(self,key,None) is None or # None's pass
+                inspect.isclass(value.type) and isinstance(getattr(self,key,None),value.type) or # Matching types pass 
+                value.type is Iterable and isinstance(getattr(self,key,None),Iterable) or # Iterables pass
                 value.type is callable and (getattr(self,key,None) is callable or dataclasses.is_dataclass(getattr(self,key,None))) # Callables pass (in some cases)
-                ])]
+            )]
         for name,dtype,value,default in attributes:
             self.coerceType(coerceMethod,name,dtype,value,default)
                 
@@ -313,17 +313,10 @@ class baseDataClass(typeEnforcer):
             data = dictFuncs().dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted,debug=debug)
         return(data)
 
-    def saveConfigFile(self,configFilePath,repr=True,inheritance=True,keepNull=True,sorted=True,debug=False):
+    def saveConfigFile(self,configFilePath,repr=True,inheritance=True,keepNull=True,header=None,sorted=False,debug=False):
         self.lastModified = self.currentTimeString()
         configDict = self.to_dict(repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted,debug=debug)
-        if hasattr(self,'header') and self.header is not None:
-            header=self.header
-        else:
-            header=None
-        try:
-            self.saveDict(configDict,fileName=configFilePath,header=header)
-        except:
-            breakpoint()
+        self.saveDict(configDict,fileName=configFilePath,header=header)
 
 
 mdMap = baseClassMethods.metadataMap
