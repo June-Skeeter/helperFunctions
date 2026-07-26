@@ -100,8 +100,6 @@ class dictFuncs:
         return vcopy
 
 
-
-
     # Load a dictionary a .json or .yml file
     # Preserve the header in a yaml file if desired
     def loadDict(self,fileName=None,returnEmpty=False,returnHeader=False,verbose=False,traceback=False,preserveComments=False):
