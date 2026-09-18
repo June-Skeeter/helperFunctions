@@ -13,6 +13,7 @@ from ruamel.yaml import YAML
 from dataclasses import is_dataclass
 
 from ruamel.yaml.scalarstring import walk_tree
+import pandas as pd
 
 yaml = YAML()
 
@@ -31,6 +32,13 @@ yaml = YAML()
 # 3. keepNull
 #   * True - include all values
 #   * False - exclude values if they are None
+
+def timestamp_representer(representer, data):
+    # Converts the Timestamp to an ISO string format
+    return representer.represent_scalar('tag:yaml.org,2002:str', data.isoformat())
+yaml.representer.add_representer(pd.Timestamp, timestamp_representer)
+
+
 
 class dictFuncs:
 
