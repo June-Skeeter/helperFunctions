@@ -134,7 +134,6 @@ class dictFuncs:
                 log(f'File format not supported for {fileName}',kill=True)
         elif returnEmpty:
             return({})
-
         else:
             log(f'Does not exist:\n {fileName}',kill=True)
         if returnHeader:
