@@ -70,7 +70,6 @@ class baseClassMethods(dictFuncs):
             out.auxargs = auxargs
             return(out)
         else:
-            # config = kwargs.pop('configFile')
             out = cls.from_yaml(fpath=kwargs['configFile'],kwargs=kwargs)
             out.auxargs = auxargs
             return(out)    
