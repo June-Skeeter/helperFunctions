@@ -205,7 +205,7 @@ class baseFunctions(baseClassMethods):
             verbose = True
         out = log(f"{msg}",traceback=traceback,verbose=verbose,cf=currentframe())
 
-    def currentTimeString(self=None,fmt='%Y-%m-%dT%H:%M:%SZ'):
+    def currentTimeString(self=None,fmt='%Y-%m-%dT%H:%M:%S%z'):
         return(datetime.now(timezone.utc).strftime(fmt))
     
     def parseDatetime(self,name,value):
