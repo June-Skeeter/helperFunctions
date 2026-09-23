@@ -204,8 +204,11 @@ class baseFunctions(baseClassMethods):
             verbose = True
         out = log(f"{msg}",traceback=traceback,verbose=verbose,cf=currentframe())
 
-    def currentTimeString(self=None,fmt='%Y-%m-%dT%H:%M:%S%z'):
-        return(datetime.now(timezone.utc).strftime(fmt))
+    def currentTimeString(self=None,fmt='iso'):
+        if fmt == 'iso':
+            return(datetime.now(timezone.utc).isoformat())
+        else:
+            return(datetime.now(timezone.utc).strftime(fmt))
     
     def parseDatetime(self,name,value):
         if hasattr(self,'timezone'):

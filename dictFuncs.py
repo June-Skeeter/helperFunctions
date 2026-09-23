@@ -150,17 +150,18 @@ class dictFuncs:
             pass
         elif not os.path.isdir(os.path.split(fileName)[0]):
             os.makedirs(os.path.split(fileName)[0])
+        cobj = obj.copy()
         if iterablesToEnd:
             # Move dicts to end, sets/list before that.  Other iterables just stay where the are for now
             pd = {}
             pl = {}
-            kl = list(obj.keys())
+            kl = list(cobj.keys())
             for k in kl:
-                if type(obj[k]) is dict:
-                    pd[k] = obj.pop(k)
-                elif type(obj[k]) is set or type(obj[k]) is list:
-                    pl[k] = obj.pop(k)
-            obj = obj | pl | pd
+                if type(cobj[k]) is dict:
+                    pd[k] = cobj.pop(k)
+                elif type(cobj[k]) is set or type(cobj[k]) is list:
+                    pl[k] = cobj.pop(k)
+            cobj = cobj | pl | pd
 
         with open(fileName,'w') as file:
             if fileName.endswith('.yml'):
@@ -173,10 +174,6 @@ class dictFuncs:
                     yaml.dump(obj,file)
                 else:
                     yaml.dump(obj,file)
-                # if anchors:
-                #     yaml.safe_dump(obj,file,sort_keys=sort_keys,default_flow_style=False)
-                # else:
-                #     yaml.safe_dump(obj,file,sort_keys=sort_keys)
             if fileName.endswith('.json'):
                 json.dump(obj,file,indent=indent)
 
