@@ -116,7 +116,7 @@ class baseClassMethods(dictFuncs):
             if param.name not in ['self'] and param.default is param.empty:
                 kwargs[param.name] = param.name
         #hiddenDefaults implicit to baseclass
-        kwargs = kwargs | {'typeCheck':False,'readOnly':True,'fromFile':False}
+        kwargs = kwargs | {'typeCheck':False,'fromFile':False}
         template = cls.from_dict(kwargs)
         templateFilePath = 'template. config FilePath'
         template = template.to_dict()
