@@ -145,24 +145,24 @@ class dictFuncs:
 
     # Save a dictionary to json or yaml format
     # Preserve yaml header if desired
-    def saveDict(self,obj,fileName,header=None,sort_keys=False,indent=None,anchors=False,stringLiterals=True,iterablesToEnd=True):
+    def saveDict(self,dictObject,fileName,header=None,sort_keys=False,indent=None,anchors=False,stringLiterals=True,iterablesToEnd=True):
         if os.path.split(fileName)[0] == '':
             pass
         elif not os.path.isdir(os.path.split(fileName)[0]):
             os.makedirs(os.path.split(fileName)[0])
-        cobj = obj.copy()
+        obj = dictObject.copy()
         if iterablesToEnd:
             # Move dicts to end, sets/list before that.  Other iterables just stay where the are for now
             pd = {}
             pl = {}
-            kl = list(cobj.keys())
+            kl = list(obj.keys())
             for k in kl:
-                if type(cobj[k]) is dict:
-                    pd[k] = cobj.pop(k)
-                elif type(cobj[k]) is set or type(cobj[k]) is list:
-                    pl[k] = cobj.pop(k)
-            cobj = cobj | pl | pd
-
+                if type(obj[k]) is dict:
+                    pd[k] = obj.pop(k)
+                elif type(obj[k]) is set or type(obj[k]) is list:
+                    pl[k] = obj.pop(k)
+            obj = obj | pl | pd
+            
         with open(fileName,'w') as file:
             if fileName.endswith('.yml'):
                 if header:
