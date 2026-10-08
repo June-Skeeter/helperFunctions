@@ -2,6 +2,7 @@ import os
 import sys
 import inspect
 import dataclasses
+from functools import partial
 from types import MappingProxyType
 from dataclasses import dataclass, field, MISSING, make_dataclass
 from .parseCoordinates import parseCoordinates
@@ -12,7 +13,7 @@ import dateparser
 from inspect import currentframe
 from .log import log
 from .cmdParse import cmdParse
-
+from configparser import ConfigParser
 from ruamel.yaml.comments import CommentedMap
 from zoneinfo import ZoneInfo
 
@@ -254,6 +255,8 @@ class typeEnforcer(baseFunctions):
         elif dtype is datetime:
             if isinstance(value,date):
                 setattr(self,name,datetime.fromisoformat(value.isoformat()))
+            elif isinstance(value,str):
+                setattr(self,name,datetime.fromisoformat(value))
             else:
                 self.parseDatetime(name,value)
         elif coerceMethod == 'full':
@@ -267,6 +270,8 @@ class typeEnforcer(baseFunctions):
                 setattr(self,name,default(**value))
             # elif value is dtype:
             #     setattr(self,name,value())
+            elif dtype == 'typing.Any':
+                pass
             else:
                 self.logMessage(f'More complex type, add method to handle: {name, dtype,value}')
                 breakpoint()
@@ -280,10 +285,13 @@ class baseDataClass(typeEnforcer):
     typeEnforce: bool = field(default=True,repr=False) # Enable type enforcement
     typeCoercion: bool = field(default=True,repr=False) # Enable type coercion if fails type check
     optionEnforce: bool = field(default=True,repr=False) #
+    useParallel: bool = field(default=True,repr=False)
     debug: bool = field(default=False,repr=False) # Allows embedding of conditional debug statements
     configFile: dict = field(default=None,repr=False)
 
     def __post_init__(self):
+        if self.debug:
+            self.useParallel = False
         if isinstance(self.configFile,str) and os.path.isfile(self.configFile):
             self.configFile = self.loadDict(self.configFile)
         if self.typeEnforce:
@@ -321,3 +329,52 @@ class baseDataClass(typeEnforcer):
 
 
 mdMap = baseClassMethods.metadataMap
+
+
+def fieldBuilder(name,base):
+    def getSec(base,name):
+        if type(base) is ConfigParser:
+            return(dict(base[name]))
+
+        return(base[name])
+
+    value = partial(getSec,base=base,name=name)
+    if value() is not None:
+        if not name.startswith('date'):
+            typ = type(value())
+        else:
+            typ = type(datetime.now())
+        if typ not in [dict,list]:  
+            return (name,type(value()),value())
+        else:
+            return (name,type(value()),field(default_factory=value))            
+    else:
+        return (name)
+
+def fromYamlDefault(filePath,bases=(),asDataclass=True,namespace=None):
+    config = baseFunctions.loadDict(None,filePath,safe=True)
+    className = os.path.split(filePath)[-1].replace('.yml','')
+    if not asDataclass: return(config)
+    dc = make_dataclass(
+        className,
+        [fieldBuilder(fld,config) for fld in config.keys()],
+        bases=bases,
+        namespace=namespace,
+        kw_only=True
+    )
+    return dc
+
+def fromIniDefault(filePath,bases=(),asDataclass=True,namespace=None):
+    config = ConfigParser()
+    config.read(filePath)
+    className = os.path.split(filePath)[-1].rsplit('.',1)[0]
+    if not asDataclass: return(config)
+    dc = make_dataclass(
+        className,
+        [fieldBuilder(fld,config) for fld in config.sections()],
+        bases=bases,
+        namespace=namespace,
+        kw_only=True
+    )
+    return dc
+    
