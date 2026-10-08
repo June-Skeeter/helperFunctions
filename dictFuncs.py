@@ -16,6 +16,7 @@ from ruamel.yaml.scalarstring import walk_tree
 import pandas as pd
 
 yaml = YAML()
+safeYaml = YAML(typ='safe')
 
 
 # Convert a dataclass to a dictionary
@@ -37,8 +38,6 @@ def timestamp_representer(representer, data):
     # Converts the Timestamp to an ISO string format
     return representer.represent_scalar('tag:yaml.org,2002:str', data.isoformat())
 yaml.representer.add_representer(pd.Timestamp, timestamp_representer)
-
-
 
 class dictFuncs:
 
@@ -110,7 +109,7 @@ class dictFuncs:
 
     # Load a dictionary a .json or .yml file
     # Preserve the header in a yaml file if desired
-    def loadDict(self,fileName,template=None,returnHeader=False,verbose=False,traceback=False,preserveComments=False):
+    def loadDict(self,fileName,template=None,returnHeader=False,verbose=False,traceback=False,preserveComments=False,safe=False):
         fileName = os.path.abspath(fileName)
         if os.path.isfile(fileName):
             if fileName.endswith('.yml') or fileName.endswith('.yaml'):
@@ -122,7 +121,10 @@ class dictFuncs:
                     else:
                         header = None
                 with open(fileName) as file:
-                    out = yaml.load(file)
+                    if not safe:
+                        out = yaml.load(file)
+                    else:
+                        out = safeYaml.load(file)
                     
                 if not preserveComments:
                     out = dict(out)
