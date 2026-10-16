@@ -2,6 +2,7 @@ import os
 import sys
 import inspect
 import dataclasses
+import numpy as np
 from functools import partial
 from types import MappingProxyType
 from dataclasses import dataclass, field, MISSING, make_dataclass
@@ -30,8 +31,8 @@ class spatialObject:
             lat,lon=lat_lon.split(',')
             self.parse(lat,lon)
         elif lat_lon is not None:
-            breakpoint()
-            self.lat_lon = f'Could not parse {lat_lon}'
+            print(f'Could not parse lat_lon')
+            self.lat_lon = [np.nan,np.nan]
         else:
             self.lat_lon = None
     
