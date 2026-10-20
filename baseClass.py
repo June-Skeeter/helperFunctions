@@ -8,7 +8,7 @@ from types import MappingProxyType
 from dataclasses import dataclass, field, MISSING, make_dataclass
 from .parseCoordinates import parseCoordinates
 from typing import Iterable, Callable
-from .dictFuncs import dictFuncs
+from .dictFunctions import dictFunctions
 from datetime import datetime, date, timezone
 import dateparser
 from inspect import currentframe
@@ -44,7 +44,7 @@ class spatialObject:
 # baseClass is a parent dataclass which gives enhanced functionality to dataclasses
 # * Supports type checking
 # * Reading and writing from yaml files (with type checking)
-class baseClassMethods(dictFuncs):
+class baseClassMethods(dictFunctions):
 
     @classmethod
     def defaults(cls):
@@ -320,7 +320,7 @@ class baseDataClass(typeEnforcer):
         if onlyID == True:
             data = {key:self.__dict__[key] for key in self.requiredArgs()} 
         else:
-            data = dictFuncs().dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted,debug=debug)
+            data = dictFunctions().dcToDict(self,repr=repr,inheritance=inheritance,keepNull=keepNull,sorted=sorted,debug=debug)
         return(data)
 
     def saveConfigFile(self,configFilePath,repr=True,inheritance=True,keepNull=True,header=None,sorted=False,debug=False):

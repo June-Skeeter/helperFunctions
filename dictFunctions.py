@@ -39,7 +39,7 @@ def timestamp_representer(representer, data):
     return representer.represent_scalar('tag:yaml.org,2002:str', data.isoformat())
 yaml.representer.add_representer(pd.Timestamp, timestamp_representer)
 
-class dictFuncs:
+class dictFunctions:
 
     def sortDict(self,obj,sorted=True):
         
