@@ -9,23 +9,30 @@ import os
 class classMethods():
 
     @classmethod
-    def from_dict(cls, env):  
+    def from_dict(cls, source):  
         # Source - https://stackoverflow.com/a/55096964
         # Posted by Arne, modified by community. See post 'Timeline' for change history
-        # Retrieved 2025-11-21, License - CC BY-SA 4.0    
-        return(cls(**{
-            k: v for k, v in env.items() 
+        # Retrieved 2025-11-21, License - CC BY-SA 4.0  
+        # Modified to accept __classmethod_flag__
+        if not hasattr(cls,'__classmethod_flag__'):
+            cls.__classmethod_flag__ = {'method':'from_dict','source':source}
+        out = cls(**{
+            k: v for k, v in source.items() 
             if k in inspect.signature(cls).parameters
-        }))
+        })
+        return(out)
         
     @classmethod
     def from_yaml(cls,fpath,kwargs={},kwargOverwrite=False):
         # if 'debug' in kwargs and kwargs['debug']:
         if kwargOverwrite:
-            env = cls.loadDict(None,fileName=fpath)|kwargs
+            source = cls.loadDict(None,fileName=fpath)|kwargs
         else:
-            env = kwargs|cls.loadDict(None,fileName=fpath)
-        return(cls.from_dict(env))
+            source = kwargs|dictFunctions.loadDict(None,fileName=fpath)
+        cls.__classmethod_flag__ = {'method':'from_yaml','source':source,'fpath':fpath}
+        out = cls.from_dict(source)
+        print(out.__classmethod_flag__)
+        return(out)
 
 
 
