@@ -109,7 +109,7 @@ class dictFunctions:
 
     # Load a dictionary a .json or .yml file
     # Preserve the header in a yaml file if desired
-    def loadDict(self,fileName,template=None,returnHeader=False,verbose=False,traceback=False,preserveComments=False,safe=False):
+    def loadDict(self,fileName,template=None,returnHeader=False,verbose=False,traceback=False,preserveComments=False,safe=False,debug=False):
         fileName = os.path.abspath(fileName)
         if os.path.isfile(fileName):
             if fileName.endswith('.yml') or fileName.endswith('.yaml'):
@@ -125,6 +125,8 @@ class dictFunctions:
                         out = yaml.load(file)
                     else:
                         out = safeYaml.load(file)
+                if debug:
+                    breakpoint()
                     
                 if not preserveComments:
                     out = dict(out)

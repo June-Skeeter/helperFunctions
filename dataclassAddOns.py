@@ -23,15 +23,10 @@ class classMethods():
         return(out)
         
     @classmethod
-    def from_yaml(cls,fpath,kwargs={},kwargOverwrite=False):
-        # if 'debug' in kwargs and kwargs['debug']:
-        if kwargOverwrite:
-            source = cls.loadDict(None,fileName=fpath)|kwargs
-        else:
-            source = kwargs|dictFunctions.loadDict(None,fileName=fpath)
+    def from_yaml(cls,fpath,kwargs={},preserveComments=False):
+        source = dictFunctions.loadDict(None,fileName=fpath,preserveComments=preserveComments)
         cls.__classmethod_flag__ = {'method':'from_yaml','source':source,'fpath':fpath}
-        out = cls.from_dict(source)
-        print(out.__classmethod_flag__)
+        out = cls.from_dict(kwargs|source)
         return(out)
 
 
