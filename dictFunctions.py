@@ -279,3 +279,6 @@ class dictFunctions:
             elif base[key] != value:
                 log([f'overwrite = {overwrite} will not update matching keys: ',base[key],value],verbose=verbose)
         return(base) 
+
+    def invertDict(self,obj):
+        return({value:key for key,value in obj.items()})
