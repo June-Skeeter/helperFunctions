@@ -23,13 +23,11 @@ class classMethods():
         return(out)
         
     @classmethod
-    def from_yaml(cls,fpath,kwargs={},preserveComments=False):
+    def from_yaml(cls,fpath,kwargs={},preserveComments=True):
         source = dictFunctions.loadDict(None,fileName=fpath,preserveComments=preserveComments)
         cls.__classmethod_flag__ = {'method':'from_yaml','source':source,'fpath':fpath}
-        out = cls.from_dict(kwargs|source)
+        out = cls.from_dict(source|kwargs)
         return(out)
-
-
 
 def fieldBuilder(name,base):
     def getSec(base,name):
