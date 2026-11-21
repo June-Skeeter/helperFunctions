@@ -8,7 +8,6 @@ def recurse(cf,msg):
     if hasattr(cf,'f_back') and cf.f_back.f_back is not None:
         msg = recurse(cf.f_back,msg)
     return(msg)
-    # breakpoint()
 
 def log(msg='',traceback=True,verbose=True,kill=False,cf=None):
     if type(msg) == list or type(msg) == tuple:
